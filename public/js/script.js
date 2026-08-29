@@ -1,23 +1,25 @@
-fetch("/api/products")
-    .then(response => response.json())
-    .then(products => {
+// fetch("/api/products")
+//     .then(response => response.json())
+//     .then(products => {
 
-        const container = document.getElementById("products-container");
+//         const container = document.getElementById("products-container");
 
-        container.innerHTML = "";
+//         container.innerHTML = "";
 
-        products.forEach(product => {
-            const productCard = document.createElement("div");
+//         products.forEach(product => {
+//             const productCard = document.createElement("div");
 
-            productCard.innerHTML = `
-                <h2>Art No: ${product.art_number}</h2>
-                <p>Price: ₹${product.price}</p>
-                `;
+//             productCard.innerHTML = `
+//                 <h2>Art No: ${product.art_number}</h2>
+//                 <p>Price: ₹${product.price}</p>
+//                 `;
 
-            container.appendChild(productCard);
-        });
-        
-    })
-    .catch(error => {
-        console.error("Error:", error);
-    });
+//             container.appendChild(productCard);
+//         });
+
+//     })
+//     .catch(error => {
+//         console.error("Error:", error);
+//     });
+
+console.log("Footwear Stock Management loaded");

@@ -32,7 +32,7 @@ app.get("/api/products", async (req, res) => {
             FROM products p
             JOIN product_variant pv
                 ON p.art_number = pv.art_number
-            JOIN stock s
+            LEFT JOIN stock s
                 ON pv.id = s.variant_id
             ORDER BY p.art_number, pv.colour, s.size
         `);
@@ -56,10 +56,13 @@ app.get("/api/products", async (req, res) => {
                 };
             }
 
-            products[row.art_number].variants[row.colour].stock.push({
-                size: row.size,
-                quantity: row.quantity
-            });
+            if (row.size !== null) {
+                products[row.art_number].variants[row.colour].stock.push({
+                    size: row.size,
+                    quantity: row.quantity
+                });
+            }
+
         }
 
         const formattedProducts = Object.values(products).map(product => ({
