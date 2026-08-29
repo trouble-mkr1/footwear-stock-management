@@ -4,5 +4,9 @@ body {
 }
 
 h1 {
-    margin-bottom: 10px;
+    margin-bottom: 30px;
+}
+
+#products-container {
+    font-size: 18px;
 }
