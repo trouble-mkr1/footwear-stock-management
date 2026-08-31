@@ -41,29 +41,23 @@
             </aside>
 
 
-            <main class = "main-content">
-
-                <h2>Dashboard</h2>
-
-                <div class = "dashboard-cards">
-
-                    <div class = "dashboard-card">
-                        <h3>TOTAL STOCK</h3>
-                        <p id = "total-stock">0</p>
-                    </div>
-
-                    <div class = "dashboard-card">
-                        <h3>PENDING ORDERS</h3>
-                        <p id = "pending-orders">0</p>
-                    </div>
-
-                    <div class = "dashboard-card">
-                        <h3>COMPLETED ORDERS</h3>
-                        <p id = "completed-orders">0</p>
-                    </div>
-
+            <main class ="main-content">
+                <div class="page-header">
+                    <h2>Product/Stock Management</h2>
+                    <button id="add-stock-button">
+                    +ADD STOCK
+                </button>
                 </div>
-
+                <div class="search-container">
+                <input 
+                    type="text"
+                    id="product-search"
+                    placeholder="Search by Art Number....."
+                    >
+                </div>
+                <div id="products-container" class="product-grid">
+                    Loding products...
+                </div>
             </main>
 
         </div>
