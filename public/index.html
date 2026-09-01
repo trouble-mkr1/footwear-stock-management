@@ -1,69 +1,98 @@
 <!DOCTYPE html>
-<html lang = "en">
+<html lang="en">
 
-    <head>
-        <meta charset = "UTF-8">
-        <meta name = "viewport" content = "width = device-width, initial-scale = 1.0">
-        <title>Footwear Stock Management</title>
-        <link rel = "stylesheet" href = "/css/style.css">
-    </head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width = device-width, initial-scale = 1.0">
+    <title>Footwear Stock Management</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
 
-    <body>
+<body>
 
-        <header class = "topbar">
-            <h1>FOOTWEAR STOCK MANAGEMENT</h1>
-        </header>
+    <header class="topbar">
+        <h1>FOOTWEAR STOCK MANAGEMENT</h1>
+    </header>
 
-        <div class = "app-container">
+    <div class="app-container">
 
-            <aside class = "sidebar">
+        <aside class="sidebar">
 
-                <button class = "nav-button active">
-                    DASHBOARD
-                </button>
+            <button class="nav-button active">
+                DASHBOARD
+            </button>
 
-                <button class = "nav-button">
-                    PRODUCT
-                </button>
+            <button class="nav-button">
+                PRODUCT
+            </button>
 
-                <button class = "nav-button">
-                    STOCK
-                </button>
+            <button class="nav-button">
+                STOCK
+            </button>
 
-                <button class = "nav-button">
-                    ORDERS
-                </button>
+            <button class="nav-button">
+                ORDERS
+            </button>
 
-                <button class = "nav-button">
-                    BILLING
-                </button>
+            <button class="nav-button">
+                BILLING
+            </button>
 
-            </aside>
+        </aside>
 
 
-            <main class ="main-content">
-                <div class="page-header">
-                    <h2>Product/Stock Management</h2>
-                    <button id="add-stock-button">
+        <main class="main-content">
+            <div class="page-header">
+                <h2>Product/Stock Management</h2>
+                <button id="add-stock-button">
                     +ADD STOCK
                 </button>
-                </div>
-                <div class="search-container">
-                <input 
-                    type="text"
-                    id="product-search"
-                    placeholder="Search by Art Number....."
-                    >
-                </div>
-                <div id="products-container" class="product-grid">
-                    Loding products...
-                </div>
-            </main>
+            </div>
+            <div class="search-container">
+                <input type="text" id="product-search" placeholder="Search by Art Number.....">
+            </div>
+            <!-- PRODUCT CATALOGUE -->
+            <div id="products-container" class="products-grid">
+                Loading products...
+            </div>
 
-        </div>
+            <!--product details-->
+            <div id="product-details" class="product-details hidden">
 
-        <script src = "/js/script.js"></script>
-        
-    </body>
+                <button id="back-button">
+                    Back to Products
+                </button>
+
+                <h2 id="details-art-number"></h2>
+
+                <p id="details-price"></p>
+
+                <img 
+                id="details-image"
+                class="details-image" 
+                alt="Product image"
+                >
+
+                <h3>Colour</h3>
+
+                <div id="colour-buttons"></div>
+                <h3>Available Stock</h3>
+                <table class="stock-table">
+                    <thead>
+                        <tr>
+                            <th>Size</th>
+                            <th>Quantity</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stock-table-body"></tbody>
+                </table>
+            </div>
+        </main>
+
+    </div>
+
+    <script src="/js/script.js"></script>
+
+</body>
 
 </html>

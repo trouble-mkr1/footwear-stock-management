@@ -66,6 +66,65 @@ function displayProducts(products){
                </p>
             </div>
         `;
+        card.addEventListener("click",()=>{
+            console.log("product:",product);
+            showProductDetails(product);
+        });
         container.appendChild(card);
+    });
+}
+
+// shows product details 
+function showProductDetails(product){
+    const productsContainer=document.getElementById("products-container");
+    const productDetails=document.getElementById("product-details");
+    
+    //Hide Catalogue Ass
+    productsContainer.classList.add("hidden");//basically calling from css bro
+    //shows product  info
+    productDetails.classList.remove("hidden");
+    document.getElementById("details-art-number").textContent=`Art No:${product.art_number}`;
+    document.getElementById("details-price").textContent=`Price: ₹${product.price}`;
+    const colourButtons=document.getElementById("colour-buttons");
+    colourButtons.innerHTML="";
+
+    product.variants.forEach((variant,index)=>{
+        const button=document.createElement("button");
+        button.textContent=variant.colour;
+        button.className="colour-button";
+        button.addEventListener("click",()=>{
+            showVariant(variant,product.variants);
+        });
+        colourButtons.appendChild(button);
+        if(index===0){//shows first variant from the table 
+            showVariant(variant,product.variants);
+            button.classList.add("active-colour");
+        }
+    });
+
+}
+//fetching variant details 
+function showVariant(selectedVariant,allVariants){
+    const image=document.getElementById("details-image");
+    image.src=`/images/${selectedVariant.image}`;
+    const tableBody=document.getElementById("stock-table-body");
+    tableBody.innerHTML="";
+    selectedVariant.stock.forEach(stockItem=>{
+        const row=document.createElement("tr");
+
+        row.innerHTML=`
+        <td>${stockItem.size}</td>
+        <td>${stockItem.quantity}</td>
+        `;
+        tableBody.appendChild(row);
+    });
+
+    //upadting active colour button
+    const buttons=document.querySelectorAll(".colour-button");
+    buttons.forEach(button=>{
+        button.classList.toggle(
+            "active-colour",
+            button.textContent===selectedVariant.colour
+        );
     });
 }
