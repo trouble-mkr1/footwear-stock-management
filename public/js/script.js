@@ -37,6 +37,10 @@ fetch("/api/products")
 function displayProducts(products){
     const container=document.getElementById("products-container");
     container.innerHTML="";
+    if(products.length===0){//if table is empty 
+        container.innerHTML="<p>'No Products Found'</p>";
+        return;
+    }
     products.forEach(product=>{
         let totalstock=0;
         let image="";
@@ -128,3 +132,22 @@ function showVariant(selectedVariant,allVariants){
         );
     });
 }
+
+//Back button functionality
+document.getElementById("back-button").addEventListener("click",()=>{
+    const productsContainer=document.getElementById("products-container");
+    const productDetails=document.getElementById("product-details");
+    productDetails.classList.add("hidden");
+    productsContainer.classList.remove("hidden");
+});
+
+//search bar functionality
+const searchInput=document.getElementById("product-search");
+searchInput.addEventListener("input",()=>{
+    const searchText=searchInput.value.trim();
+    const filteredProducts=allProducts.filter(product=>{
+        return product.art_number.toString()
+        .includes(searchText);
+    });
+    displayProducts(filteredProducts);
+});
