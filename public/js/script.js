@@ -37,7 +37,7 @@ fetch("/api/products")
 function displayProducts(products){
     const container=document.getElementById("products-container");
     container.innerHTML="";
-    if(products.length===0){//if table is empty 
+    if(products.length===0){//if table is empty or does not contain the value  
         container.innerHTML="<p>'No Products Found'</p>";
         return;
     }
@@ -150,4 +150,17 @@ searchInput.addEventListener("input",()=>{
         .includes(searchText);
     });
     displayProducts(filteredProducts);
+});
+
+//Functions of Add Product
+const addStockButton=document.getElementById("add-stock-button");
+const addStockForm=document.getElementById("add-stock-form");
+const productsContainer=document.getElementById("products-container");
+const productDetails=document.getElementById("product-details");
+
+addStockButton.addEventListener("click",()=>{
+
+    productsContainer.classList.add("hidden");
+    productDetails.classList.add("hidden");
+    addStockForm.classList.remove("hidden");
 });

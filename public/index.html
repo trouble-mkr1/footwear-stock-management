@@ -67,11 +67,7 @@
 
                 <p id="details-price"></p>
 
-                <img 
-                id="details-image"
-                class="details-image" 
-                alt="Product image"
-                >
+                <img id="details-image" class="details-image" alt="Product image">
 
                 <h3>Colour</h3>
 
@@ -86,6 +82,35 @@
                     </thead>
                     <tbody id="stock-table-body"></tbody>
                 </table>
+            </div>
+
+            <!--Adding Stock-->
+            <div id="add-stock-form" class="hidden">
+                <h2>Add Stock</h2>
+                <form id="stock-form">
+                    <label for="stock-art-number">Art Number</label>
+                    <input 
+                    type="text"
+                    id="stock-art-number"
+                    placeholder="Enter Art Number"
+                    autocomplete="off"
+                    >
+                    <label for="stock-colour">Colour</label>
+                    <select id="stock-colour" required>
+                        <option value="">Select Colour </option>
+
+                    </select>
+                    <label for="stock-size">Size</label>
+
+                    <input type="number" id="stock-quantity" min="1" required>
+                    
+
+                    <label for="stock-quantity">Quantity</label>
+                    <input type="number" id="stock-quantity" min="1" required>
+                    <button type="submit">
+                        Add Stock
+                    </button>
+                </form>
             </div>
         </main>
 
