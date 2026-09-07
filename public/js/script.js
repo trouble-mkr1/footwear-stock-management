@@ -25,15 +25,33 @@
 //console.log("Footwear Stock Management loaded");
 console.log("Scripts running");
 let allProducts = [];
-fetch("/api/products")
-    .then(response =>response.json())
-    .then(products=>{
+let selectedStockProduct=null;
+let selectedStockVariant=null;
+
+async function loadProduct(){
+    try {
+        const response=await fetch("/api/products");
+        const products=await response.json();
         allProducts=products;
         displayProducts(products);
-    })
-    .catch(error=>{
+        setupAddStockSearch();
+    } catch(error){
         console.error("Error Loading Products:",error);
-    });
+    }
+}
+loadProduct();
+
+async function refreshProduct() {
+    try {
+        const response=await fetch("/api/products");
+        const products=await response.json();
+        allProducts=products;
+        displayProducts(products);
+    } catch(error){
+        console.error("Error in Refreshing Products!! ",error);
+    }
+}
+
 function displayProducts(products){
     const container=document.getElementById("products-container");
     container.innerHTML="";
@@ -164,3 +182,115 @@ addStockButton.addEventListener("click",()=>{
     productDetails.classList.add("hidden");
     addStockForm.classList.remove("hidden");
 });
+
+//Add stock search functionality
+function setupAddStockSearch(){
+    const artInput=document.getElementById("stock-art-number");
+    const suggestions=document.getElementById("art-suggestions");
+    artInput.addEventListener("input",()=>{
+        const searchText=artInput.value.trim().toLowerCase();
+        suggestions.innerHTML="";
+        if(searchText===""){
+            suggestions.classList.add("hidden");
+            return;
+        }
+        const matchingProducts=allProducts.filter(product=>
+            product.art_number.toString()
+            .toLowerCase()
+            .includes(searchText) 
+        );
+        if(matchingProducts.length===0){
+            suggestions.innerHTML="<p>No Products Found</p>";
+            suggestions.classList.remove("hidden");
+            return;
+        }
+        matchingProducts.forEach(product=>{
+            const suggestion=document.createElement("div");
+            suggestion.className="art-suggestion";
+            suggestion.textContent=product.art_number;
+            suggestion.addEventListener("click",()=>{
+                artInput.value=product.art_number;
+                suggestions.classList.add("hidden");
+                loadStockColours(product);
+           
+        });
+        suggestions.appendChild(suggestion);
+        });
+        suggestions.classList.remove("hidden");
+    });
+}
+function loadStockColours(product){
+    selectedStockProduct=product;
+    selectedStockVariant=null;
+
+    const colourSelect=document.getElementById("stock-colour");
+    colourSelect.innerHTML='<option value="">Select Colour</option>';
+    product.variants.forEach(variant=>{
+        const option=document.createElement("option");
+        option.value=variant.colour;
+        option.textContent=variant.colour;
+        colourSelect.appendChild(option);
+    });
+}
+//Colour Selection functionality
+const stockColourSelect=document.getElementById("stock-colour");
+stockColourSelect.addEventListener("change",()=>{
+    const selectedColour=stockColourSelect.value;
+    if(!selectedStockProduct||selectedColour===""){
+        selectedStockVariant=null;
+        return;
+    }
+    selectedStockVariant=selectedStockProduct.variants.find(
+        variant=>variant.colour==selectedColour
+    );
+
+    console.log("Selected Product:",selectedStockProduct);
+    console.log("Selected Variant:",selectedStockVariant);
+});
+
+
+const stockForm =document.getElementById("stock-form");
+stockForm.addEventListener("submit",handleAddStock);
+
+async function handleAddStock(event){
+    event.preventDefault();
+
+    const artNumber=document.getElementById("stock-art-number").value.trim();
+    const colour=document.getElementById("stock-colour").value;
+    const size=document.getElementById("stock-size").value;
+    const quantity=document.getElementById("stock-quantity").value;
+
+    if(artNumber===""||colour===""||size===""||quantity===""){
+        alert("Please Fill All The Fields.");
+        return;
+    }
+    try {
+        const response=await fetch("/api/stock",{
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body: JSON.stringify({
+                art_number:artNumber,
+                colour:colour,
+                size:Number(size),
+                quantity:Number(quantity)
+            })
+        });
+        const result=await response.json();
+        if(!response.ok)
+        {
+            throw new Error(result.error||"Failed To Add Stock");
+        }
+        alert("Stock Added Successfully!");
+        await refreshProduct();
+        stockForm.reset();
+        
+        addStockForm.classList.add("hidden");
+        productsContainer.classList.remove("hidden");
+    }catch(error){
+        console.error("Error:ADDING STOCK",error)
+
+        alert("Failed To Add Stock!!");
+    }
+}

@@ -95,18 +95,22 @@
                     placeholder="Enter Art Number"
                     autocomplete="off"
                     >
+                    <div id="art-suggestions" class="suggestions hidden"></div>
+
                     <label for="stock-colour">Colour</label>
                     <select id="stock-colour" required>
                         <option value="">Select Colour </option>
 
                     </select>
+
                     <label for="stock-size">Size</label>
 
-                    <input type="number" id="stock-quantity" min="1" required>
+                    <input type="number" id="stock-size" min="1" required>
                     
 
                     <label for="stock-quantity">Quantity</label>
                     <input type="number" id="stock-quantity" min="1" required>
+                   
                     <button type="submit">
                         Add Stock
                     </button>
