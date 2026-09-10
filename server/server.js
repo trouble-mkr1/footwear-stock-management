@@ -84,14 +84,33 @@ app.post("/api/stock",async(req,res)=>{
     try{
         const{art_number,colour,size,quantity}=req.body;
 
+        if( !art_number|| !colour|| !size|| !quantity){
+            return res.status(400).json({
+                error: "Please Fill All Fields!"
+            });
+        }
+
+        const productResult=await pool.query(
+            `select art_number 
+            from products 
+            where art_number=$1`,[art_number]
+        );
+
+        if(productResult.rows.length===0){
+            return res.status(404).json({
+                error: "Product not found. Please Add New Product."
+            });
+        }
+
         const variantResult=await pool.query(
-            `select id from product_variant where art_number=$1 and colour=$2`,[art_number,colour]
+            `select id from product_variant where art_number=$1 and lower(colour)=lower($2)`,[art_number,colour.trim()]
         );
         if(variantResult.rows.length===0)
         {
-            return res.status(404).json({error:"Product Variant Not Found"});
+            return res.status(404).json({error:"Product Not Found. Please Add New Product"});
         }
         const variantId=variantResult.rows[0].id;
+
         const stockResult=await pool.query(
             `select id from stock where variant_id= $1 and size= $2`,[variantId,size]
         );

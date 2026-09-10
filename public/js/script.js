@@ -25,21 +25,16 @@
 //console.log("Footwear Stock Management loaded");
 console.log("Scripts running");
 let allProducts = [];
-let selectedStockProduct=null;
-let selectedStockVariant=null;
 
-async function loadProduct(){
-    try {
-        const response=await fetch("/api/products");
-        const products=await response.json();
-        allProducts=products;
+fetch("/api/products")
+    .then(response => response.json())
+    .then(products => {
+        allProducts = products;
         displayProducts(products);
-        setupAddStockSearch();
-    } catch(error){
-        console.error("Error Loading Products:",error);
-    }
-}
-loadProduct();
+    })
+    .catch(error => {
+        console.error("Error Loading Products:", error);
+    });
 
 async function refreshProduct() {
     try {
@@ -183,70 +178,6 @@ addStockButton.addEventListener("click",()=>{
     addStockForm.classList.remove("hidden");
 });
 
-//Add stock search functionality
-function setupAddStockSearch(){
-    const artInput=document.getElementById("stock-art-number");
-    const suggestions=document.getElementById("art-suggestions");
-    artInput.addEventListener("input",()=>{
-        const searchText=artInput.value.trim().toLowerCase();
-        suggestions.innerHTML="";
-        if(searchText===""){
-            suggestions.classList.add("hidden");
-            return;
-        }
-        const matchingProducts=allProducts.filter(product=>
-            product.art_number.toString()
-            .toLowerCase()
-            .includes(searchText) 
-        );
-        if(matchingProducts.length===0){
-            suggestions.innerHTML="<p>No Products Found</p>";
-            suggestions.classList.remove("hidden");
-            return;
-        }
-        matchingProducts.forEach(product=>{
-            const suggestion=document.createElement("div");
-            suggestion.className="art-suggestion";
-            suggestion.textContent=product.art_number;
-            suggestion.addEventListener("click",()=>{
-                artInput.value=product.art_number;
-                suggestions.classList.add("hidden");
-                loadStockColours(product);
-           
-        });
-        suggestions.appendChild(suggestion);
-        });
-        suggestions.classList.remove("hidden");
-    });
-}
-function loadStockColours(product){
-    selectedStockProduct=product;
-    selectedStockVariant=null;
-
-    const colourSelect=document.getElementById("stock-colour");
-    colourSelect.innerHTML='<option value="">Select Colour</option>';
-    product.variants.forEach(variant=>{
-        const option=document.createElement("option");
-        option.value=variant.colour;
-        option.textContent=variant.colour;
-        colourSelect.appendChild(option);
-    });
-}
-//Colour Selection functionality
-const stockColourSelect=document.getElementById("stock-colour");
-stockColourSelect.addEventListener("change",()=>{
-    const selectedColour=stockColourSelect.value;
-    if(!selectedStockProduct||selectedColour===""){
-        selectedStockVariant=null;
-        return;
-    }
-    selectedStockVariant=selectedStockProduct.variants.find(
-        variant=>variant.colour==selectedColour
-    );
-
-    console.log("Selected Product:",selectedStockProduct);
-    console.log("Selected Variant:",selectedStockVariant);
-});
 
 
 const stockForm =document.getElementById("stock-form");
@@ -291,6 +222,6 @@ async function handleAddStock(event){
     }catch(error){
         console.error("Error:ADDING STOCK",error)
 
-        alert("Failed To Add Stock!!");
+        alert(error.message);
     }
 }
