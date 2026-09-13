@@ -143,6 +143,69 @@ app.post("/api/stock",async(req,res)=>{
         });
     }
 });
+app.post("/api/products", async (req, res) => {
+    try {
+
+        const { art_number, colour, price, size, quantity } = req.body;
+
+        
+        if (!art_number || !colour || !price || !size || !quantity) {
+            return res.status(400).json({
+                error: "Please fill all fields."
+            });
+        }
+
+        
+        const productResult = await pool.query(
+            `SELECT art_number
+             FROM products
+             WHERE art_number = $1`,
+            [art_number]
+        );
+
+        if (productResult.rows.length > 0) {
+            return res.status(409).json({
+                error: "Product already exists. Use Add Stock instead."
+            });
+        }
+
+        
+        await pool.query(
+            `INSERT INTO products (art_number, price)
+             VALUES ($1, $2)`,
+            [art_number, price]
+        );
+
+        
+        const variantResult = await pool.query(
+            `INSERT INTO product_variant (art_number, colour)
+             VALUES ($1, $2)
+             RETURNING id`,
+            [art_number, colour.trim()]
+        );
+
+        const variantId = variantResult.rows[0].id;
+
+       
+        await pool.query(
+            `INSERT INTO stock (variant_id, size, quantity)
+             VALUES ($1, $2, $3)`,
+            [variantId, size, quantity]
+        );
+
+        res.json({
+            message: "Product added successfully."
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            error: "Failed to add product."
+        });
+    }
+});
 
 app.listen(3000, () => {
     console.log("Server running at http://localhost:3000");

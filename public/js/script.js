@@ -36,7 +36,7 @@ fetch("/api/products")
         console.error("Error Loading Products:", error);
     });
 
-async function refreshProduct() {
+async function refreshProducts() {
     try {
         const response=await fetch("/api/products");
         const products=await response.json();
@@ -183,6 +183,13 @@ addStockButton.addEventListener("click",()=>{
 const stockForm =document.getElementById("stock-form");
 stockForm.addEventListener("submit",handleAddStock);
 
+const addNewProductButton=document.getElementById("add-new-product-button");
+const addNewProductForm=document.getElementById("add-new-product-form");
+addNewProductButton.addEventListener("click",()=>{
+    addStockForm.classList.add("hidden");
+    addNewProductForm.classList.remove("hidden");
+});
+
 async function handleAddStock(event){
     event.preventDefault();
 
@@ -214,7 +221,7 @@ async function handleAddStock(event){
             throw new Error(result.error||"Failed To Add Stock");
         }
         alert("Stock Added Successfully!");
-        await refreshProduct();
+        await refreshProducts();
         stockForm.reset();
         
         addStockForm.classList.add("hidden");
@@ -225,3 +232,60 @@ async function handleAddStock(event){
         alert(error.message);
     }
 }
+
+const newProductForm=document.getElementById("new-product-form");
+newProductForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const artNumber=document.getElementById("new-art-number").value.trim();
+    const colour=document.getElementById("new-colour").value.trim();
+    const price=document.getElementById("new-price").value;
+    const size=document.getElementById("new-size").value;
+    const quantity=document.getElementById("new-quantity").value;
+
+    if(artNumber === "" ||
+        colour === "" ||
+        price === "" ||
+        size === "" ||
+        quantity === ""
+    ){
+        alert("Please Fill all the Fields!!");
+        return;
+    }
+
+    try{
+        const response = await fetch("/api/products",{
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                art_number: artNumber,
+                colour: colour,
+                price: Number(price),
+                size: Number(size),
+                quantity: Number(quantity)
+            })
+        });
+
+        const result = await response.json();
+
+        if(!response.ok){
+            throw new Error(result.error || "Failed To Add Prodct!!");
+        }
+
+        alert("Product Added Sucessfully...");
+
+        newProductForm.reset();
+
+        addNewProductForm.classList.add("hidden");
+        productsContainer.classList.remove("hidden");
+
+        await refreshProducts();
+    }catch(error) {
+        console.error("Error!! Adding Products:",error);
+        alert(error.message);
+    }
+});  

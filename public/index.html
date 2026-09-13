@@ -94,27 +94,86 @@
                     id="stock-art-number"
                     placeholder="Enter Art Number"
                     autocomplete="off"
+                    required
                     >
-                    <div id="art-suggestions" class="suggestions hidden"></div>
-
+                    
                     <label for="stock-colour">Colour</label>
-                    <select id="stock-colour" required>
-                        <option value="">Select Colour </option>
-
-                    </select>
+                        <input
+                            type="text"
+                            id="stock-colour"
+                            placeholder="Enter Colour"
+                            required
+                        >
+                    
 
                     <label for="stock-size">Size</label>
 
-                    <input type="number" id="stock-size" min="1" required>
+                    <input 
+                        type="number" 
+                        id="stock-size" 
+                        min="1" 
+                        placeholder="Enter Size"
+                        required>
                     
 
                     <label for="stock-quantity">Quantity</label>
-                    <input type="number" id="stock-quantity" min="1" required>
+                    <input 
+                        type="number" 
+                        id="stock-quantity" 
+                        min="1" 
+                        placeholder="Enter Quantity"
+                        required>
                    
-                    <button type="submit">
-                        Add Stock
-                    </button>
+                    <button type="submit">Add Stock</button>
                 </form>
+            </div>
+            <button type="button" id="add-new-product-button">+Add New Product</button>
+            
+            <!--New Product Catalouge-->
+            <div id="add-new-product-form" class="hidden">
+                <h2>ADD NEW PRODUCT</h2>
+                <form id="new-product-form">
+                    <label for="new-art-number">Art Number</label>
+                    <input
+                        type="text"
+                        id="new-art-number"
+                        placeholder="Enter Art Number"
+                        required
+                    >
+                    <label for="new-colour">Colour</label>
+                    <input
+                        type="text"
+                        id="new-colour"
+                        placeholder="Enter Colour"
+                        required
+                    >
+                    <label for="new-price">Price</label>
+                    <input
+                        type="number"
+                        id="new-price"
+                        min="1"
+                        placeholder="Enter Price"
+                        required
+                    >
+                    <label for="new-size">Size</label>
+                    <input
+                        type="number"
+                        id="new-size"
+                        min="1"
+                        placeholder="Enter Size"
+                        required
+                    >
+                    <label for="new-quantity">Quantity</label>
+                    <input
+                        type="number"
+                        id="new-quantity"
+                        placeholder="Enter No.of Quantity"
+                        required
+                    >
+                    <button type="submit">Add Product</button>
+
+                </form>
+
             </div>
         </main>
 
