@@ -1,7 +1,20 @@
 const express = require("express");
 const pool = require("./db");
+const multer = require("multer");
+const path = require("path");
 
 const app = express();
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, path.join(__dirname, "../public/images"));
+    },
+
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
+const upload = multer({ storage: storage }); 
 
 app.use(express.json());
 app.use(express.static("public"));
@@ -143,13 +156,15 @@ app.post("/api/stock",async(req,res)=>{
         });
     }
 });
-app.post("/api/products", async (req, res) => {
+app.post("/api/products", upload.single("image"), async (req, res) => {
     try {
 
         const { art_number, colour, price, size, quantity } = req.body;
+        
+        const image=req.file;
 
         
-        if (!art_number || !colour || !price || !size || !quantity) {
+        if (!art_number || !colour || !price || !size || !quantity || !image) {
             return res.status(400).json({
                 error: "Please fill all fields."
             });
@@ -178,10 +193,10 @@ app.post("/api/products", async (req, res) => {
 
         
         const variantResult = await pool.query(
-            `INSERT INTO product_variant (art_number, colour)
-             VALUES ($1, $2)
+            `INSERT INTO product_variant (art_number, colour, image)
+             VALUES ($1, $2, $3)
              RETURNING id`,
-            [art_number, colour.trim()]
+            [art_number, colour.trim(), image.filename]
         );
 
         const variantId = variantResult.rows[0].id;

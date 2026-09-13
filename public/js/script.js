@@ -237,40 +237,44 @@ const newProductForm=document.getElementById("new-product-form");
 newProductForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const artNumber=document.getElementById("new-art-number").value.trim();
-    const colour=document.getElementById("new-colour").value.trim();
-    const price=document.getElementById("new-price").value;
-    const size=document.getElementById("new-size").value;
-    const quantity=document.getElementById("new-quantity").value;
+    const artNumber = document.getElementById("new-art-number").value.trim();
+    const colour = document.getElementById("new-colour").value.trim();
+    const price = document.getElementById("new-price").value;
+    const size = document.getElementById("new-size").value;
+    const quantity = document.getElementById("new-quantity").value;
+    const image = document.getElementById("new-image").files[0];
 
     if(artNumber === "" ||
         colour === "" ||
         price === "" ||
         size === "" ||
-        quantity === ""
+        quantity === ""||
+        !image
     ){
         alert("Please Fill all the Fields!!");
         return;
     }
 
     try{
-        const response = await fetch("/api/products",{
+        const formData = new FormData();
+
+        formData.append("art_number", artNumber);
+        formData.append("colour", colour);
+        formData.append("price", price);
+        formData.append("size", size);
+        formData.append("quantity", quantity);
+        formData.append("image", image);
+
+        const response = await fetch("/api/products", {
             method: "POST",
-
-            headers: {
-                "Content-Type": "application/json"
-            },
-
-            body: JSON.stringify({
-                art_number: artNumber,
-                colour: colour,
-                price: Number(price),
-                size: Number(size),
-                quantity: Number(quantity)
-            })
+            body: formData
         });
+        
+        const responseText = await response.text();
+        console.log("Status:", response.status);
+        console.log("Response:", responseText);
 
-        const result = await response.json();
+        const result = JSON.parse(responseText);
 
         if(!response.ok){
             throw new Error(result.error || "Failed To Add Prodct!!");
