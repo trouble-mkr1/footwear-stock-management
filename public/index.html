@@ -30,7 +30,7 @@
                 STOCK
             </button>
 
-            <button class="nav-button">
+            <button class="nav-button" id="orders-button">
                 ORDERS
             </button>
 
@@ -125,9 +125,10 @@
                         required>
                    
                     <button type="submit">Add Stock</button>
+                    <button type="button" id="add-new-product-button">+Add New Product</button>
                 </form>
             </div>
-            <button type="button" id="add-new-product-button">+Add New Product</button>
+            
             
             <!--New Product Catalouge-->
             <div id="add-new-product-form" class="hidden">
@@ -177,10 +178,31 @@
                         accept="image/*"
                         required
                     >
+                    <img
+                        id="image-preview"
+                        class="image-preview"
+                        alt="Selected product image"
+                    >
                     <button type="submit">Add Product</button>
-
+                    <button type="button" id="cancel-new-product">Cancel</button>
                 </form>
 
+            </div>
+
+            <!--ORDER-PAGE LAYOUt-->
+            <div id="orders-page" class="hidden">
+                <div class="page-header">
+                    <h2>ORDERS</h2>
+                    <button id="add-orders-button">+Add Order</button>
+                </div>
+                <div id="search-container">
+                    <input
+                        type="text"
+                        id="order-search"
+                        placeholder="Search by Company Name..."
+                    >
+                </div>
+                <div id="orders-container">Loading Orders</div>
             </div>
         </main>
 

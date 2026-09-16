@@ -234,6 +234,29 @@ async function handleAddStock(event){
 }
 
 const newProductForm=document.getElementById("new-product-form");
+const newImage = document.getElementById("new-image");
+const imagePreview = document.getElementById("image-preview");
+const cancelNewProduct = document.getElementById("cancel-new-product");
+newImage.addEventListener("change", () => {
+        const file = newImage.files[0];
+        if(file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                imagePreview.src = event.target.result;
+                imagePreview.classList.remove("hidden");
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+cancelNewProduct.addEventListener("click", () => {
+    newProductForm.reset();
+    imagePreview.src = "";
+    imagePreview.classList.add("hidden");
+    addNewProductForm.classList.add("hidden");
+    productsContainer.classList.remove("hidden");
+});
+
 newProductForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -243,7 +266,7 @@ newProductForm.addEventListener("submit", async (event) => {
     const size = document.getElementById("new-size").value;
     const quantity = document.getElementById("new-quantity").value;
     const image = document.getElementById("new-image").files[0];
-
+   
     if(artNumber === "" ||
         colour === "" ||
         price === "" ||
@@ -292,4 +315,52 @@ newProductForm.addEventListener("submit", async (event) => {
         console.error("Error!! Adding Products:",error);
         alert(error.message);
     }
-});  
+}); 
+
+//Order-Page
+const ordersButton = document.getElementById("orders-button");
+const ordersPage = document.getElementById("orders-page");
+const ordersContainer = document.getElementById("orders-container");
+const ordersSearch = document.getElementById("order-search");
+
+ordersButton.addEventListener("click", () => {
+    productsContainer.classList.add("hidden");
+    productDetails.classList.add("hidden");
+    addStockForm.classList.add("hidden");
+    ordersPage.classList.remove("hidden");
+
+    loadOrders();
+});
+
+async function loadOrders() {
+    try {
+        const response = await fetch("/api/orders");
+        const orders = await response.json();
+        displayOrders(orders);
+    }catch (error) {
+        console.error("ERROR IN LOADING ORDERS!!!", error);
+        ordersContainer.innerHTML = "Failed To Load Orders!!!";
+    }
+}
+
+function displayOrders(orders) {
+    ordersContainer.innerHTML = "";
+    if (orders.length === 0){
+        ordersContainer.innerHTML = "<p>NO Pending Orders.</p>";
+        return;
+    }
+    orders.forEach(order => {
+        const orderCard = document.createElement("div");
+        orderCard.classList.add("order-card");
+        orderCard.innerHTML = `
+        <div class="order-info"> 
+            <h3>${order.company_name}</h3>
+            <p>ART No: ${order.art_number}</p>
+            <p>Quantity: ${order.quantity}</p>
+            <p>Address: ${order.address}</p>
+        </div>
+        <button class="complete-order-button" data-id="${order.id}">COMPLETE</button>    
+        `;
+        ordersContainer.appendChild(orderCard);
+    });
+}

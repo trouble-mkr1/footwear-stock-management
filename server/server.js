@@ -222,6 +222,46 @@ app.post("/api/products", upload.single("image"), async (req, res) => {
     }
 });
 
+app.get("/api/orders", async(req,res) => {
+    try {
+        const result = await pool.query(`
+            select * from orders
+            where status='Pending'
+            ORDER BY id DESC
+        `);
+        res.json(result.rows);
+    }catch (error) {
+        console.log(error);
+        res.status(500).json({error: "Failed To Load Orders!!"});
+    }
+});
+app.put("/api/orders/:id/complete", async(req, res) => {
+    try {
+        const orderId = req.params.id;
+        const result = await pool.query(
+            `update orders
+             set status = 'Completed'
+             where id = $1
+             returning *`,
+             [orderId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                error: "Order Not Found!!"
+            });
+        }
+        res.json({
+            message: "ORDER COMPLETED SUCCESSFULLY..",
+            order: result.row[0]
+        });
+    }catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Failed To Complete Oreder!!!"
+        });
+    }
+});
+
 app.listen(3000, () => {
     console.log("Server running at http://localhost:3000");
 });
