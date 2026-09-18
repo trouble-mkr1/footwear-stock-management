@@ -193,7 +193,7 @@
             <div id="orders-page" class="hidden">
                 <div class="page-header">
                     <h2>ORDERS</h2>
-                    <button id="add-orders-button">+Add Order</button>
+                    <button id="add-order-button">+Add Order</button>
                 </div>
                 <div id="search-container">
                     <input
@@ -203,6 +203,71 @@
                     >
                 </div>
                 <div id="orders-container">Loading Orders</div>
+            </div>
+            
+
+            <!--ADD-ORDER SECTION-->
+            <div id="add-order-form" class="hidden">
+                <div class="page-header">
+                    <h2>ADD ORDERS</h2>
+                </div>
+                <form id="order-form">
+                    <lable for="order-company-name">
+                        Company Name
+                    </lable>
+                    <input  
+                        type="text"
+                        id="order-company-name"
+                        placeholder="Enter Company Name"
+                        required
+                    >
+                    <lable for="order-art-number">
+                       Art No
+                    </lable>
+                    <input  
+                        type="text"
+                        id="order-art-number"
+                        placeholder="Enter Art Number"
+                        required
+                    >
+                    <lable for="order-colour">
+                        Colour
+                    </lable>
+                    <input  
+                        type="text"
+                        id="order-colour"
+                        placeholder="Enter Colour"
+                        required
+                    >
+                    <lable for="order-size">
+                        Size
+                    </lable>
+                    <input  
+                        type="text"
+                        id="order-size"
+                        placeholder="Enter Size"
+                        required
+                    >
+                    <lable for="order-quantity">
+                        Quantity
+                    </lable>
+                    <input  
+                        type="text"
+                        id="order-quantity"
+                        placeholder="Enter Quantity"
+                        required
+                    >
+                    <lable for="order-address">
+                        Address
+                    </lable>
+                    <textarea  
+                        id="order-address"
+                        placeholder="Enter Address"
+                        required
+                    ></textarea>
+                    <button type="submit">SAVE ORDER</button>
+                    <button type="button" id="cancel-order">CANCEL</button>
+                </form>
             </div>
         </main>
 

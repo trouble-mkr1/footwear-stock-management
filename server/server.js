@@ -222,6 +222,7 @@ app.post("/api/products", upload.single("image"), async (req, res) => {
     }
 });
 
+//Orders-page
 app.get("/api/orders", async(req,res) => {
     try {
         const result = await pool.query(`
@@ -242,7 +243,7 @@ app.put("/api/orders/:id/complete", async(req, res) => {
             `update orders
              set status = 'Completed'
              where id = $1
-             returning *`,
+             RETURNING *`,
              [orderId]
         );
         if (result.rows.length === 0) {
@@ -252,15 +253,38 @@ app.put("/api/orders/:id/complete", async(req, res) => {
         }
         res.json({
             message: "ORDER COMPLETED SUCCESSFULLY..",
-            order: result.row[0]
+            order: result.rows[0]
         });
     }catch (error) {
         console.error(error);
         res.status(500).json({
-            error: "Failed To Complete Oreder!!!"
+            error: "Failed To Complete Order!!!"
         });
     }
 });
+
+app.post("/api/orders", async(req,res) => {
+    try {
+        const {company_name, art_number, colour, size, quantity, address} = req.body;
+
+        const result = await pool.query(`
+            insert into orders (company_name, art_number, colour, size, quantity, address)
+            values($1,$2,$3,$4,$5,$6) RETURNING *`,
+            [company_name, art_number, colour, size, quantity, address] );
+
+            res.status(201).json({
+                message: "Order Added Sucessfully..",
+                order: result.rows[0]
+            });
+    }catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            error: "Failed To Add Orders!!!"
+        });
+    }
+});
+
 
 app.listen(3000, () => {
     console.log("Server running at http://localhost:3000");

@@ -322,6 +322,10 @@ const ordersButton = document.getElementById("orders-button");
 const ordersPage = document.getElementById("orders-page");
 const ordersContainer = document.getElementById("orders-container");
 const ordersSearch = document.getElementById("order-search");
+const addOrderButton = document.getElementById("add-order-button");
+const addOrderForm = document.getElementById("add-order-form");
+const cancelOrder = document.getElementById("cancel-order");
+const orderForm = document.getElementById("order-form");
 
 ordersButton.addEventListener("click", () => {
     productsContainer.classList.add("hidden");
@@ -330,6 +334,62 @@ ordersButton.addEventListener("click", () => {
     ordersPage.classList.remove("hidden");
 
     loadOrders();
+});
+
+addOrderButton.addEventListener("click", () => {
+    ordersPage.classList.add("hidden");
+    addOrderForm.classList.remove("hidden");
+});
+cancelOrder.addEventListener("click", () => {
+    ordersPage.classList.remove("hidden");
+    addOrderForm.classList.add("hidden");
+
+    loadOrders();
+});
+
+orderForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const companyName = document.getElementById("order-company-name").value;
+    const artNumber = document.getElementById("order-art-number").value;
+    const colour = document.getElementById("order-colour").value;
+    const size = document.getElementById("order-size").value;
+    const quantity = document.getElementById("order-quantity").value;
+    const address = document.getElementById("order-address").value;
+
+    try {
+        const response = await fetch("/api/orders", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                company_name: companyName,
+                art_number: artNumber,
+                colour: colour,
+                size: size,
+                quantity: quantity,
+                address: address
+            })
+        });
+
+        const data = await response.json();
+
+        if(!response.ok) {
+            alert(data.error || "Failed To Add Orders!!!");
+            return;
+        }
+        alert("Order Added Sucessfully..");
+        orderForm.reset();
+
+        addOrderForm.classList.add("hidden");
+        ordersPage.classList.remove("hidden");
+
+        loadOrders();
+    } catch (error) {
+        console.error("ERROR: FAILED IN ADDING ORDER!!!", error);
+        alert("Something Went Wrong While Adding The Order..");
+    }
 });
 
 async function loadOrders() {
@@ -364,3 +424,30 @@ function displayOrders(orders) {
         ordersContainer.appendChild(orderCard);
     });
 }
+
+ordersContainer.addEventListener("click", async (event) => {
+    if(!event.target.classList.contains("complete-order-button")) {
+        return;
+    }
+
+    const orderId = event.target.dataset.id;
+
+    try {
+        const respone = await fetch(`/api/orders/${orderId}/complete`, {
+            method: "PUT"
+        });
+
+        const data = await respone.json();
+        if(!respone.ok) {
+            alert(data.error || "Failed To Complete Orders!!");
+            return;
+        }
+
+        alert("Order Completed Successfully..");
+
+        loadOrders();
+    } catch (error) {
+        console.error("ERROR: IN COMPLETING ORDER!!!", error);
+        alert("Something Went Wrong While Completing The Order..");
+    }
+});
