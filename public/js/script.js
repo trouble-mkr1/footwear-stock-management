@@ -318,14 +318,40 @@ newProductForm.addEventListener("submit", async (event) => {
 }); 
 
 //Order-Page
+let allOrders = [];
+
+fetch("/api/orders")
+    .then(response => response.json())
+    .then(orders => {
+        allOrders = orders;
+        displayOrders(orders);
+    })
+    .catch(error => {
+        console.error("Error Loading Orders", error);
+    });
+
 const ordersButton = document.getElementById("orders-button");
 const ordersPage = document.getElementById("orders-page");
 const ordersContainer = document.getElementById("orders-container");
-const ordersSearch = document.getElementById("order-search");
+const orderSearch = document.getElementById("order-search");
+
+orderSearch.addEventListener("input", () =>{
+    const searchText = orderSearch.value.toLowerCase();
+    const filteredOrder = allOrders.filter(order =>
+        order.company_name.toLowerCase().includes(searchText) ||
+        order.art_number.toLowerCase().includes(searchText)
+    );
+    displayOrders(filteredOrder);
+});
+
 const addOrderButton = document.getElementById("add-order-button");
 const addOrderForm = document.getElementById("add-order-form");
 const cancelOrder = document.getElementById("cancel-order");
 const orderForm = document.getElementById("order-form");
+
+const orderDetailsPage = document.getElementById("order-details-page");
+const orderDetailsContainer = document.getElementById("order-details-container");
+const backToOrders = document.getElementById("back-to-orders");
 
 ordersButton.addEventListener("click", () => {
     productsContainer.classList.add("hidden");
@@ -414,7 +440,9 @@ function displayOrders(orders) {
         orderCard.classList.add("order-card");
         orderCard.innerHTML = `
         <div class="order-info"> 
-            <h3>${order.company_name}</h3>
+            <h3 class="order-company-name" data-id="${order.id}">
+            ${order.company_name}
+            </h3>
             <p>ART No: ${order.art_number}</p>
             <p>Quantity: ${order.quantity}</p>
             <p>Address: ${order.address}</p>
@@ -424,6 +452,51 @@ function displayOrders(orders) {
         ordersContainer.appendChild(orderCard);
     });
 }
+
+ordersContainer.addEventListener("click", async (event) => {
+    if(!event.target.classList.contains("order-company-name")) {
+        return;
+    }
+
+    const orderId = event.target.dataset.id;
+    await loadOrderDetails(orderId);
+})
+
+async function loadOrderDetails(orderId) {
+    try {
+        const response = await fetch(`/api/orders/${orderId}`);
+
+        const order = await response.json();
+        if(!response.ok) {
+            alert(order.error || "Failed To Load Order Detalis!!");
+            return;
+        }
+        orderDetailsContainer.innerHTML = `
+        <div class="order-deatls-card">
+            <h3>${order.company_name}</h3>
+            <p><strong>Art No:</strong>
+                ${order.art_number}</p>
+            <p><strong>Colour:</strong>
+                ${order.colour}</p>
+            <p><strong>Size:</strong>
+                ${order.size}</p> 
+            <p><strong>Quantity:</strong>
+                ${order.quantity}</p>   
+            <p><strong>Address:</strong>
+                ${order.address}</p>
+            <p><strong>Status:</strong>
+                ${order.status}</p>
+        </div>
+         `;
+        ordersPage.classList.add("hidden");
+        addOrderForm.classList.add("hidden");
+        orderDetailsPage.classList.remove("hidden");
+    } catch(error) {
+        console.error("ERROR: IN LOADING DETAILS!!!", error);
+        alert("Something Went Wrong While Loading Details.");
+    }
+}
+
 
 ordersContainer.addEventListener("click", async (event) => {
     if(!event.target.classList.contains("complete-order-button")) {
@@ -450,4 +523,10 @@ ordersContainer.addEventListener("click", async (event) => {
         console.error("ERROR: IN COMPLETING ORDER!!!", error);
         alert("Something Went Wrong While Completing The Order..");
     }
+});
+
+backToOrders.addEventListener("click", () => {
+    orderDetailsPage.classList.add("hidden");
+    ordersPage.classList.remove("hidden");
+    loadOrders();
 });

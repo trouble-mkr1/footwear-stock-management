@@ -285,7 +285,27 @@ app.post("/api/orders", async(req,res) => {
     }
 });
 
+app.get("/api/orders/:id", async (req, res) => {
+    try {
+        const orderId = req.params.id;
 
+        const result = await pool.query(`
+            select * from orders where id=$1`,
+        [orderId]
+        );
+        if (result.rows.length === 0){
+            return res.status(404).json({
+            error: "Order Not Found!!"
+            }); 
+        }
+        res.json(result.rows[0]);
+    } catch(error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Failed To Load Order Details"
+        });
+    }
+});
 app.listen(3000, () => {
     console.log("Server running at http://localhost:3000");
 });
