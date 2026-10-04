@@ -264,24 +264,44 @@ app.put("/api/orders/:id/complete", async(req, res) => {
 });
 
 app.post("/api/orders", async(req,res) => {
-    try {
-        const {company_name, art_number, colour, size, quantity, address} = req.body;
 
-        const result = await pool.query(`
-            insert into orders (company_name, art_number, colour, size, quantity, address)
-            values($1,$2,$3,$4,$5,$6) RETURNING *`,
-            [company_name, art_number, colour, size, quantity, address] );
+    const client = await pool.connect();
+
+    try {
+        const {company_name, address, items} = req.body;
+        await client.query('BEGIN');
+
+        const orderResult = await pool.query(`
+            insert into orders (company_name, address)
+            values($1,$2) RETURNING id`,
+            [company_name, address] );
+
+            const orderId = orderResult.rows[0].id;
+
+            for (const item of items) {
+                await client.query(`
+                    insert into order_items (order_id, art_number, colour, size, quantity)
+                    values ($1, $2, $3, $4, $5)`,
+                    [orderId, item.art_number, item.colour, item.size, item.quantity]
+                );
+            }
+
+            await client.query("COMMIT");
 
             res.status(201).json({
                 message: "Order Added Sucessfully..",
-                order: result.rows[0]
+                order_id: orderId
             });
     }catch (error) {
+        await client.query("ROLLBACK");
+
         console.error(error);
 
         res.status(500).json({
             error: "Failed To Add Orders!!!"
         });
+    } finally {
+        client.release();
     }
 });
 
@@ -289,16 +309,34 @@ app.get("/api/orders/:id", async (req, res) => {
     try {
         const orderId = req.params.id;
 
-        const result = await pool.query(`
-            select * from orders where id=$1`,
+        const orderResult = await pool.query(`
+            select id,
+            company_name, 
+            address,
+            status from orders where id=$1`,
         [orderId]
         );
-        if (result.rows.length === 0){
+        if (orderResult.rows.length === 0){
             return res.status(404).json({
             error: "Order Not Found!!"
             }); 
         }
-        res.json(result.rows[0]);
+
+        const itemResult = await pool.query(`
+            select
+                id,
+                art_number,
+                colour,
+                size,
+                quantity
+            from order_items
+            where order_id = $1
+            ORDER BY id
+            `, [orderId]
+        );
+        const order = orderResult.rows[0];
+        order.items = itemResult.rows;
+        res.json(order);
     } catch(error) {
         console.error(error);
         res.status(500).json({

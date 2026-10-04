@@ -96,6 +96,7 @@ function showProductDetails(product){
     const productsContainer=document.getElementById("products-container");
     const productDetails=document.getElementById("product-details");
     
+
     //Hide Catalogue Ass
     productsContainer.classList.add("hidden");//basically calling from css bro
     //shows product  info
@@ -170,9 +171,11 @@ const addStockButton=document.getElementById("add-stock-button");
 const addStockForm=document.getElementById("add-stock-form");
 const productsContainer=document.getElementById("products-container");
 const productDetails=document.getElementById("product-details");
+const pageHead = document.getElementById("page-head");
 
 addStockButton.addEventListener("click",()=>{
 
+    pageHead.classList.add("hidden");
     productsContainer.classList.add("hidden");
     productDetails.classList.add("hidden");
     addStockForm.classList.remove("hidden");
@@ -348,12 +351,15 @@ const addOrderButton = document.getElementById("add-order-button");
 const addOrderForm = document.getElementById("add-order-form");
 const cancelOrder = document.getElementById("cancel-order");
 const orderForm = document.getElementById("order-form");
+const orderItemsContainer = document.getElementById("order-items-container");
+const addOrderItemButton = document.getElementById("add-order-item");
 
 const orderDetailsPage = document.getElementById("order-details-page");
 const orderDetailsContainer = document.getElementById("order-details-container");
 const backToOrders = document.getElementById("back-to-orders");
 
 ordersButton.addEventListener("click", () => {
+    pageHead.classList.add("hidden");
     productsContainer.classList.add("hidden");
     productDetails.classList.add("hidden");
     addStockForm.classList.add("hidden");
@@ -373,15 +379,61 @@ cancelOrder.addEventListener("click", () => {
     loadOrders();
 });
 
+addOrderItemButton.addEventListener("click", () => {
+    const newItem = document.createElement("div");
+    newItem.classList.add("order-item");
+    newItem.innerHTML = `<label> Art No: <label>
+    <input 
+        type = "text"
+        class = "order-art-number"
+        placeholder = "Enter Art Number"
+        required
+    >   
+    <label> Colour: <label>
+    <input
+        type = "text"
+        class = "order-colour"
+        placeholder = "Enter Colour"
+        required
+    >
+    <label> Size: <label>
+    <input
+        type = "number" 
+        class = "order-size"
+        placeholder = "Enter Size"
+        required
+    >
+    <label> Quantity: <label>
+    <input
+        type = "number"
+        class = "order-quantity"
+        placeholder = "Enter Quantity"
+        required
+    > 
+    `;
+    orderItemsContainer.appendChild(newItem);
+});
+
 orderForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const companyName = document.getElementById("order-company-name").value;
-    const artNumber = document.getElementById("order-art-number").value;
-    const colour = document.getElementById("order-colour").value;
-    const size = document.getElementById("order-size").value;
-    const quantity = document.getElementById("order-quantity").value;
     const address = document.getElementById("order-address").value;
+    const orderItems = document.querySelectorAll(".order-item");
+    const items = [];
+    orderItems.forEach(item => {
+        const artNumber = item.querySelector(".order-art-number").value;
+        const colour = item.querySelector(".order-colour").value;
+        const size = item.querySelector(".order-size").value;
+        const quantity = item.querySelector(".order-quantity").value;
+
+        items.push({
+            art_number: artNumber,
+            colour: colour,
+            size: size,
+            quantity: quantity
+        });
+    });
 
     try {
         const response = await fetch("/api/orders", {
@@ -391,11 +443,8 @@ orderForm.addEventListener("submit", async (event) => {
             },
             body: JSON.stringify({
                 company_name: companyName,
-                art_number: artNumber,
-                colour: colour,
-                size: size,
-                quantity: quantity,
-                address: address
+                address: address,
+                items: items
             })
         });
 
@@ -443,9 +492,8 @@ function displayOrders(orders) {
             <h3 class="order-company-name" data-id="${order.id}">
             ${order.company_name}
             </h3>
-            <p>ART No: ${order.art_number}</p>
-            <p>Quantity: ${order.quantity}</p>
             <p>Address: ${order.address}</p>
+            <p>Status: ${order.status}</p>
         </div>
         <button class="complete-order-button" data-id="${order.id}">COMPLETE</button>    
         `;
@@ -474,18 +522,24 @@ async function loadOrderDetails(orderId) {
         orderDetailsContainer.innerHTML = `
         <div class="order-deatls-card">
             <h3>${order.company_name}</h3>
-            <p><strong>Art No:</strong>
-                ${order.art_number}</p>
-            <p><strong>Colour:</strong>
-                ${order.colour}</p>
-            <p><strong>Size:</strong>
-                ${order.size}</p> 
-            <p><strong>Quantity:</strong>
-                ${order.quantity}</p>   
-            <p><strong>Address:</strong>
+             <p><strong>Address:</strong>
                 ${order.address}</p>
             <p><strong>Status:</strong>
                 ${order.status}</p>
+            <h4>Order Items:</h4>
+            <div class="order-items-list">
+                ${order.items.map(item =>`
+                     <div class="order-items-details">
+                        <p><strong>Art No:</strong>
+                         ${item.art_number}</p>
+                        <p><strong>Colour:</strong>
+                            ${item.colour}</p>
+                        <p><strong>Size:</strong>
+                            ${item.size}</p>
+                        <p><strong>Quantity:</strong>
+                            ${item.quantity}</p>
+            </div>
+            `).join("")};    
         </div>
          `;
         ordersPage.classList.add("hidden");
