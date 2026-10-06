@@ -26,9 +26,7 @@
                 PRODUCT
             </button>
 
-            <button class="nav-button">
-                STOCK
-            </button>
+          
 
             <button class="nav-button" id="orders-button">
                 ORDERS
@@ -42,19 +40,21 @@
 
 
         <main class="main-content">
-            <div class="page-header">
+            <div id="page-head" class="page-header">
                 <h2>Product/Stock Management</h2>
                 <button id="add-stock-button">
                     +ADD STOCK
                 </button>
-            </div>
-            <div class="search-container">
+                <div class="search-container">
                 <input type="text" id="product-search" placeholder="Search by Art Number.....">
             </div>
+            </div>
+            
             <!-- PRODUCT CATALOGUE -->
             <div id="products-container" class="products-grid">
                 Loading products...
             </div>
+            
 
             <!--product details-->
             <div id="product-details" class="product-details hidden">
@@ -221,45 +221,51 @@
                         placeholder="Enter Company Name"
                         required
                     >
-                    <lable for="order-art-number">
+                 <div id="order-items-container">
+                    <div class="order-item">
+                        <label>
                        Art No
-                    </lable>
+                    </label>
                     <input  
                         type="text"
-                        id="order-art-number"
+                        class="order-art-number"
                         placeholder="Enter Art Number"
                         required
                     >
-                    <lable for="order-colour">
+                    <label>
                         Colour
-                    </lable>
+                    </label>
                     <input  
                         type="text"
-                        id="order-colour"
+                        class="order-colour"
                         placeholder="Enter Colour"
                         required
                     >
-                    <lable for="order-size">
+                    <label>
                         Size
-                    </lable>
+                    </label>
                     <input  
                         type="text"
-                        id="order-size"
+                        class="order-size"
                         placeholder="Enter Size"
                         required
                     >
-                    <lable for="order-quantity">
+                    <label>
                         Quantity
-                    </lable>
+                    </label>
                     <input  
                         type="text"
-                        id="order-quantity"
+                        class="order-quantity"
                         placeholder="Enter Quantity"
                         required
                     >
-                    <lable for="order-address">
+                    <button type="button" id="add-order-item">+ADD ANOTHER ITEM</button>
+                    </div>
+                 </div>   
+                    
+                    <label for="order-address">
                         Address
-                    </lable>
+                    </label>
                     <textarea  
                         id="order-address"
                         placeholder="Enter Address"
@@ -281,7 +287,7 @@
                     Loading order details........
                 </div>
             </div>
-            </div>
+            
         </main>
 
     </div>
