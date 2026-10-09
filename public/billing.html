@@ -6,6 +6,89 @@
     <meta name = "viewport" content = "width = device-width, initial-scale = 1.0">
     <title>Billing - Footwear Stock Management</title>
     <link rel = "stylesheet" href = "/css/style.css">
+
+    <style>
+        .billing-content {
+            padding: 20px;
+        }
+
+        .billing-controls {
+            margin-bottom: 20px;
+        }
+
+        .billing-controls select {
+            width: 100%;
+            max-width: 450px;
+            padding: 10px;
+            margin-top: 8px;
+        }
+
+        .invoice {
+            background: white;
+            color: #222;
+            padding: 25px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .invoice h2 {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+        }
+
+        .invoice-table th, .invoice-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        .invoice-table th {
+            background: #f2f2f2;
+        }
+
+        .invoice-total {
+            text-align: right;
+            margin-top: 20px;
+        }
+
+        .billing-actions {
+            margin-top: 20px;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+
+            #invoice-container, #invoice-container * {
+                visibility: visible;
+            }
+
+            #invoice-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+
+            .invoice {
+                border: none;
+                padding: 0;
+            }
+
+            .invoice-table {
+                font-size: 12px;
+            }
+        }
+
+    </style>
 </head>
 
 <body>
@@ -18,23 +101,23 @@
 
         <aside class = "sidebar">
 
-            <button class = "nav-button">
+            <button class = "nav-button" onclick = "window.location.href='/'">
                 DASHBOARD
             </button>
 
-            <button class = "nav-button">
+            <button class = "nav-button" onclick = "window.location.href='/'">
                 PRODUCT
             </button>
 
-            <button class = "nav-button">
+            <button class = "nav-button" onclick = "window.location.href='/'">
                 STOCK
             </button>
 
-            <button class = "nav-button">
+            <button class = "nav-button" onclick = "window.location.href='/'">
                 ORDERS
             </button>
 
-            <button class = "nav-button active">
+            <button class = "nav-button active"  onclick = "window.location.href='/billing.html'">
                 BILLING
             </button>
 
@@ -46,13 +129,37 @@
                 <h2>Billing</h2>
             </div>
 
-            <div>
-                <h3>Billing Page</h3>
-                <p>Billing function will be added here after a few tests</p>
+            <div class = "billing-content">
+                <div class = "billing-controls">
+                    <label for = "billing-order-select">
+                        <strong>Select Order</strong>
+                    </label>
+
+                    <br>
+
+                    <select id = "billing-order-select">
+                        <option value = ""> Loading orders</option>
+                    </select>
+
+                    <p id = "billing-message">
+                        Loading orders . . .
+                    </p>
+                </div>
+
+                <div id = "invoice-container"></div>
+
+                <div class = "billing-actions">
+                    <button id = "print-invoice" disabled>
+                        Print Invoice
+                    </button>
+                </div>
+                
             </div>
 
         </main>
     </div>
+
+    <script src = "/js/billing.js"></script>
 
 </body>
 

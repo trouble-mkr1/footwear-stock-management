@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("./db");
 const multer = require("multer");
 const path = require("path");
+const { error } = require("console");
 
 const app = express();
 
@@ -23,10 +24,25 @@ app.get("/", (req, res) => {
     res.send("Footwear Stock Management Server");
 });
 
+// app.get("/test-db", async (req, res) => {
+//     try {
+//         const result = await pool.query("SELECT NOW()");
+//         res.json(result.rows);
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).send("Database connection failed");
+//     }
+// });
+
 app.get("/test-db", async (req, res) => {
     try {
-        const result = await pool.query("SELECT NOW()");
-        res.json(result.rows);
+        const result = await pool.query(`
+            SELECT
+                current_database(),
+                NOW()
+            `);
+
+            res.json(result.rows);
     } catch (error) {
         console.error(error);
         res.status(500).send("Database connection failed");
@@ -269,21 +285,82 @@ app.post("/api/orders", async(req,res) => {
 
     try {
         const {company_name, address, items} = req.body;
+        if (!company_name || !address || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                error: "Please provide company name, address, and atleast one item."
+            });
+        }
         await client.query('BEGIN');
 
-        const orderResult = await pool.query(`
+        const orderResult = await client.query(`
             insert into orders (company_name, address)
             values($1,$2) RETURNING id`,
             [company_name, address] );
 
             const orderId = orderResult.rows[0].id;
 
+            // for (const item of items) {
+            //     await client.query(`
+            //         insert into order_items (order_id, art_number, colour, size, quantity)
+            //         values ($1, $2, $3, $4, $5)`,
+            //         [orderId, item.art_number, item.colour, item.size, item.quantity]
+            //     );
+            // }
+
             for (const item of items) {
+
+                if (!item.art_number || !item.colour || !item.size || !item.quantity || item.quantity <= 0) {
+                    throw new Error("Invalid order item.")
+                }
+
+                // find the product variant
+                const variantResult = await client.query(`
+                    SELECT id
+                    FROM product_variant
+                    WHERE art_number = $1
+                    AND LOWER(colour) = LOWER($2)
+                `, [item.art_number, item.colour.trim()]);
+
+                if (variantResult.rows.length === 0) {
+                    throw new Error(
+                        `Product variant not found: ${item.art_number} - ${item.colour}`
+                    );
+                }
+
+                const variantId = variantResult.rows[0].id;
+
+                // now reduce stock only if there r enough qty available
+                const stockResult = await client.query(`
+                    UPDATE stock
+                    SET quantity = quantity - $1
+                    WHERE variant_id = $2
+                    AND size = $3
+                    AND quantity >= $1
+                    RETURNING quantity
+                `, [
+                    item.quantity,
+                    variantId,
+                    item.size
+                ]);
+
+                if (stockResult.rows.length === 0) {
+                    throw new Error(
+                        `Insufficient stock: ${item.art_number} - ${item.colour} - size ${item.size}`
+                    );
+                }
+
+                // save the order item
                 await client.query(`
-                    insert into order_items (order_id, art_number, colour, size, quantity)
-                    values ($1, $2, $3, $4, $5)`,
-                    [orderId, item.art_number, item.colour, item.size, item.quantity]
-                );
+                    INSERT INTO order_items
+                    (order_id, art_number, colour, size, quantity)
+                    VALUES ($1, $2, $3, $4, $5)
+                `, [
+                    orderId,
+                    item.art_number,
+                    item.colour,
+                    item.size,
+                    item.quantity
+                ]);
             }
 
             await client.query("COMMIT");
@@ -344,6 +421,27 @@ app.get("/api/orders/:id", async (req, res) => {
         });
     }
 });
+
+
+// to get all orders for the billing page
+app.get("/api/billing/orders", async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT id, company_name, address, status
+            FROM orders
+            ORDER BY id DESC
+        `);
+
+        res.json(result.rows);
+    } catch (error) {
+        console.error("Failed to order billing orders:", error);
+        res.status(500).json({
+            error: "Failed to load billing orders."
+        });
+    }
+});
+
+
 app.listen(3000, () => {
     console.log("Server running at http://localhost:3000");
 });
