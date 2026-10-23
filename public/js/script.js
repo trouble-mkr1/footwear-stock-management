@@ -73,7 +73,8 @@ function displayProducts(products){
             >
             <div class="product-info">
                 <h3>Art No: ${product.art_number}</h3>
-                <p>Price: ₹${product.price}</p>
+                <p>MRP: ₹${product.mrp ?? "Not Set"}</p>
+                <p>Unit Price: ₹${product.price}</p>
                 <p>
                     ${
                         totalstock>0
@@ -102,7 +103,7 @@ function showProductDetails(product){
     //shows product  info
     productDetails.classList.remove("hidden");
     document.getElementById("details-art-number").textContent=`Art No:${product.art_number}`;
-    document.getElementById("details-price").textContent=`Price: ₹${product.price}`;
+    document.getElementById("details-price").textContent=`MRP: ₹${product.mrp ?? "Not Set"} | Unit Price: ₹${product.price}`;
     const colourButtons=document.getElementById("colour-buttons");
     colourButtons.innerHTML="";
 
@@ -265,6 +266,7 @@ newProductForm.addEventListener("submit", async (event) => {
 
     const artNumber = document.getElementById("new-art-number").value.trim();
     const colour = document.getElementById("new-colour").value.trim();
+    const mrp = document.getElementById("new-mrp").value;
     const price = document.getElementById("new-price").value;
     const size = document.getElementById("new-size").value;
     const quantity = document.getElementById("new-quantity").value;
@@ -272,6 +274,7 @@ newProductForm.addEventListener("submit", async (event) => {
    
     if(artNumber === "" ||
         colour === "" ||
+        mrp === "" ||
         price === "" ||
         size === "" ||
         quantity === ""||
@@ -286,6 +289,7 @@ newProductForm.addEventListener("submit", async (event) => {
 
         formData.append("art_number", artNumber);
         formData.append("colour", colour);
+        formData.append("mrp", mrp);
         formData.append("price", price);
         formData.append("size", size);
         formData.append("quantity", quantity);

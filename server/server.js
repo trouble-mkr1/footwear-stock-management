@@ -55,6 +55,7 @@ app.get("/api/products", async (req, res) => {
             SELECT
                 p.art_number,
                 p.price,
+                p.mrp,
                 pv.colour,
                 pv.image,
                 s.size,
@@ -74,6 +75,7 @@ app.get("/api/products", async (req, res) => {
                 products[row.art_number] = {
                     art_number: row.art_number,
                     price: row.price,
+                    mrp: row.mrp,
                     variants: {}
                 };
             }
@@ -175,12 +177,12 @@ app.post("/api/stock",async(req,res)=>{
 app.post("/api/products", upload.single("image"), async (req, res) => {
     try {
 
-        const { art_number, colour, price, size, quantity } = req.body;
+        const { art_number, colour, mrp, price, size, quantity } = req.body;
         
         const image=req.file;
 
         
-        if (!art_number || !colour || !price || !size || !quantity || !image) {
+        if (!art_number || !colour || !mrp || !price || !size || !quantity || !image) {
             return res.status(400).json({
                 error: "Please fill all fields."
             });
@@ -202,9 +204,9 @@ app.post("/api/products", upload.single("image"), async (req, res) => {
 
         
         await pool.query(
-            `INSERT INTO products (art_number, price)
-             VALUES ($1, $2)`,
-            [art_number, price]
+            `INSERT INTO products (art_number, price, mrp)
+             VALUES ($1, $2, $3)`,
+            [art_number, price, mrp]
         );
 
         

@@ -95,15 +95,25 @@ function formatCurrency(amount) {
 
 function renderInvoice(order) {
     const rows = order.items.map(item => {
-        const price = getProductPrice(item.art_number);
-        const lineTotal = price * Number(item.quantity);
+        const product = products.find(
+            product =>
+                String(product.art_number) === String(item.art_number)
+        );
+
+        const mrp = product?.mrp;
+        const price = product ? Number(product.price) : 0;
+        const quantity = Number(item.quantity);
+        const lineTotal = price * quantity;
 
         return `
             <tr>
                 <td>${escapeHTML(item.art_number)}</td>
                 <td>${escapeHTML(item.colour)}</td>
                 <td>${escapeHTML(String(item.size))}</td>
-                <td>${item.quantity}</td>
+                <td>${quantity}</td>
+                <td>${mrp != null && mrp !==""
+                    ? formatCurrency(Number(mrp))
+                    : "-"}</td>
                 <td>${formatCurrency(price)}</td>
                 <td>${formatCurrency(lineTotal)}</td>
             </tr>
@@ -111,8 +121,8 @@ function renderInvoice(order) {
     }).join("");
 
     const total = order.items.reduce((sum, item) => {
-        return sum +
-            getProductPrice(item.art_number) * Number(item.quantity);
+        const price = getProductPrice(item.art_number);
+        return sum + price * Number(item.quantity);
     }, 0);
 
     invoiceContainer.innerHTML = `
@@ -130,6 +140,7 @@ function renderInvoice(order) {
                         <th>Colour</th>
                         <th>Size</th>
                         <th>Qty</th>
+                        <th>MRP</th>
                         <th>Unit Price</th>
                         <th>Amount</th>
                     </tr>
