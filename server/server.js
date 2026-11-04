@@ -111,6 +111,60 @@ app.get("/api/products", async (req, res) => {
 });
 
 
+// Dashboard summary API
+app.get("/api/dashboard", async (req, res) => {
+    try {
+        // Get total number of products
+        const productResult = await pool.query(`
+            SELECT COUNT(*) AS total_products
+            FROM products
+        `);
+
+        // Get total available stock
+        const stockResult = await pool.query(`
+            SELECT COALESCE(SUM(quantity), 0) AS total_stock
+            FROM stock
+        `);
+
+        // Get total number of orders
+        const orderResult = await pool.query(`
+            SELECT COUNT(*) AS total_orders
+            FROM orders
+        `);
+
+        // Get number of low-stock products
+        const lowStockResult = await pool.query(`
+            SELECT COUNT(*) AS low_stock
+            FROM (
+                SELECT p.art_number
+                FROM products p
+                LEFT JOIN product_variant pv
+                    ON p.art_number = pv.art_number
+                LEFT JOIN stock s
+                    ON pv.id = s.variant_id
+                GROUP BY p.art_number
+                HAVING COALESCE(SUM(s.quantity), 0) <= 5
+            ) AS low_stock_products
+        `);
+
+        res.json({
+            totalProducts: Number(productResult.rows[0].total_products),
+            totalStock: Number(stockResult.rows[0].total_stock),
+            totalOrders: Number(orderResult.rows[0].total_orders),
+            lowStock: Number(lowStockResult.rows[0].low_stock)
+        });
+
+    } catch (error) {
+        console.error("Dashboard Error:", error);
+
+        res.status(500).json({
+            error: "Failed to load dashboard data"
+        });
+    }
+});
+
+
+
 app.post("/api/stock",async(req,res)=>{
     try{
         const{art_number,colour,size,quantity}=req.body;

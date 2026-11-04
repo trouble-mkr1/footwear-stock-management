@@ -16,31 +16,63 @@
 
     <div class="app-container">
 
-        <aside class="sidebar">
+        
+<aside class="sidebar">
 
-            <button class="nav-button active">
-                DASHBOARD
-            </button>
+    <button class="nav-button active" id="dashboard-button">
+        DASHBOARD
+    </button>
 
-            <button class="nav-button">
-                PRODUCT
-            </button>
+    <button class="nav-button" id="product-button">
+        PRODUCT
+    </button>
 
-          
+    <button class="nav-button" id="orders-button">
+        ORDERS
+    </button>
 
-            <button class="nav-button" id="orders-button">
-                ORDERS
-            </button>
+    <button class="nav-button" id="billing-button"
+        onclick="window.location.href='/billing.html'">
+        BILLING
+    </button>
 
-            <button class="nav-button" id = "billing-button" onclick = "window.location.href='/billing.html'">
-                BILLING
-            </button>
-
-        </aside>
+</aside>
 
 
         <main class="main-content">
-            <div id="page-head" class="page-header">
+            
+<!-- Dashboard Page -->
+<section id="dashboard-page">
+    <div class="page-header">
+        <h2>Dashboard Overview</h2>
+    </div>
+
+    <div class="dashboard-cards">
+
+        <div class="dashboard-card">
+            <h3>Total Products</h3>
+            <p id="total-products">0</p>
+        </div>
+
+        <div class="dashboard-card">
+            <h3>Total Stock</h3>
+            <p id="total-stock">0</p>
+        </div>
+
+        <div class="dashboard-card">
+            <h3>Total Orders</h3>
+            <p id="total-orders">0</p>
+        </div>
+
+        <div class="dashboard-card">
+            <h3>Low Stock</h3>
+            <p id="low-stock">0</p>
+        </div>
+
+    </div>
+</section>
+
+            <div id="page-head" class="page-header hidden">
                 <h2>Product/Stock Management</h2>
                 <button id="add-stock-button">
                     +ADD STOCK
@@ -51,7 +83,7 @@
             </div>
             
             <!-- PRODUCT CATALOGUE -->
-            <div id="products-container" class="products-grid">
+            <div id="products-container" class="products-grid hidden">
                 Loading products...
             </div>
             

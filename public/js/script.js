@@ -24,6 +24,37 @@
 
 //console.log("Footwear Stock Management loaded");
 console.log("Scripts running");
+
+// Load Dashboard Summary
+function loadDashboard() {
+    fetch("/api/dashboard")
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Failed to load dashboard data");
+            }
+            return response.json();
+        })
+        .then(data => {
+            document.getElementById("total-products").textContent =
+                data.totalProducts;
+
+            document.getElementById("total-stock").textContent =
+                data.totalStock;
+
+            document.getElementById("total-orders").textContent =
+                data.totalOrders;
+
+            document.getElementById("low-stock").textContent =
+                data.lowStock;
+        })
+        .catch(error => {
+            console.error("Dashboard Error:", error);
+        });
+}
+
+// Load dashboard when the page opens
+loadDashboard();
+
 let allProducts = [];
 
 fetch("/api/products")
@@ -173,6 +204,9 @@ const addStockForm=document.getElementById("add-stock-form");
 const productsContainer=document.getElementById("products-container");
 const productDetails=document.getElementById("product-details");
 const pageHead = document.getElementById("page-head");
+const dashboardButton = document.getElementById("dashboard-button");
+const productButton = document.getElementById("product-button");
+const dashboardPage = document.getElementById("dashboard-page");
 
 addStockButton.addEventListener("click",()=>{
 
@@ -362,15 +396,15 @@ const orderDetailsPage = document.getElementById("order-details-page");
 const orderDetailsContainer = document.getElementById("order-details-container");
 const backToOrders = document.getElementById("back-to-orders");
 
+// Orders navigation
 ordersButton.addEventListener("click", () => {
-    pageHead.classList.add("hidden");
-    productsContainer.classList.add("hidden");
-    productDetails.classList.add("hidden");
-    addStockForm.classList.add("hidden");
+    hideAllMainSections();
     ordersPage.classList.remove("hidden");
 
+    updateActiveNav(ordersButton);
     loadOrders();
 });
+
 
 addOrderButton.addEventListener("click", () => {
     ordersPage.classList.add("hidden");
@@ -587,4 +621,43 @@ backToOrders.addEventListener("click", () => {
     orderDetailsPage.classList.add("hidden");
     ordersPage.classList.remove("hidden");
     loadOrders();
+});
+// Hide all main content sections
+function hideAllMainSections() {
+    dashboardPage.classList.add("hidden");
+    pageHead.classList.add("hidden");
+    productsContainer.classList.add("hidden");
+    productDetails.classList.add("hidden");
+    addStockForm.classList.add("hidden");
+    addNewProductForm.classList.add("hidden");
+    ordersPage.classList.add("hidden");
+    addOrderForm.classList.add("hidden");
+    orderDetailsPage.classList.add("hidden");
+}
+
+// Update the active sidebar button
+function updateActiveNav(activeButton) {
+    document.querySelectorAll(".nav-button").forEach(button => {
+        button.classList.remove("active");
+    });
+
+    activeButton.classList.add("active");
+}
+
+// Dashboard navigation
+dashboardButton.addEventListener("click", () => {
+    hideAllMainSections();
+    dashboardPage.classList.remove("hidden");
+
+    updateActiveNav(dashboardButton);
+    loadDashboard();
+});
+
+// Product navigation
+productButton.addEventListener("click", () => {
+    hideAllMainSections();
+    pageHead.classList.remove("hidden");
+    productsContainer.classList.remove("hidden");
+
+    updateActiveNav(productButton);
 });
