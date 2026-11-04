@@ -405,17 +405,34 @@ app.post("/api/orders", async(req,res) => {
                     );
                 }
 
-                // save the order item
+                // save current products prices when placing orders
+                const priceResult = await client.query(`
+                    
+                    SELECT price, mrp
+                    FROM products
+                    WHERE art_nummber = $1
+                `, [item.art_number]);
+
+                if (priceResult.rows.length === 0) {
+                    throw new Error(`Product not found: ${item.art_number}`);
+                }
+
+                const unitPrice = priceResult.rows[0].price;
+                const mrp = priceResult.rows[0].mrp;
+
+                // save the order item along with its current price
                 await client.query(`
                     INSERT INTO order_items
-                    (order_id, art_number, colour, size, quantity)
-                    VALUES ($1, $2, $3, $4, $5)
+                    (order_id, art_number, colour, size, quantity, unit_price, mrp)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
                 `, [
                     orderId,
                     item.art_number,
                     item.colour,
                     item.size,
-                    item.quantity
+                    item.quantity,
+                    unitPrice,
+                    mrp
                 ]);
             }
 
@@ -456,14 +473,16 @@ app.get("/api/orders/:id", async (req, res) => {
         }
 
         const itemResult = await pool.query(`
-            select
+            SELECT
                 id,
                 art_number,
                 colour,
                 size,
-                quantity
-            from order_items
-            where order_id = $1
+                quantity,
+                unit_price,
+                mrp
+            FROM order_items
+            WHERE order_id = $1
             ORDER BY id
             `, [orderId]
         );

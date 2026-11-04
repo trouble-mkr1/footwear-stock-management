@@ -4,23 +4,18 @@ const message = document.getElementById("billing-message");
 const printButton = document.getElementById("print-invoice");
 
 let billingOrders = [];
-let products = [];
 
 async function loadBillingData() {
     try {
         message.textContent = "Loading orders . . . ";
 
-        const [ordersResponse, productsResponse] = await Promise.all([
-            fetch("/api/billing/orders"),
-            fetch("/api/products")
-        ]);
+        const ordersResponse = await fetch("/api/billing/orders");
 
-        if (!ordersResponse.ok || !productsResponse.ok) {
+        if (!ordersResponse.ok) {
             throw new Error("Could not load billing data");
         }
 
         billingOrders = await ordersResponse.json();
-        products = await productsResponse.json();
 
         orderSelect.innerHTML = '<option value = "">Select an order</option>';
 
@@ -77,14 +72,6 @@ orderSelect.addEventListener("change", async () => {
     }
 });
 
-function getProductPrice(artNumber) {
-    const product = products.find(
-        item => String(item.art_number) === String(artNumber)
-    );
-
-    return product ? Number(product.price) : 0;
-}
-
 function formatCurrency(amount) {
     return new Intl.NumberFormat("en-IN", {
         style: "currency",
@@ -95,13 +82,8 @@ function formatCurrency(amount) {
 
 function renderInvoice(order) {
     const rows = order.items.map(item => {
-        const product = products.find(
-            product =>
-                String(product.art_number) === String(item.art_number)
-        );
-
-        const mrp = product?.mrp;
-        const price = product ? Number(product.price) : 0;
+        const mrp = item.mrp;
+        const price = Number(item.unit_price ?? 0);
         const quantity = Number(item.quantity);
         const lineTotal = price * quantity;
 
@@ -121,7 +103,7 @@ function renderInvoice(order) {
     }).join("");
 
     const total = order.items.reduce((sum, item) => {
-        const price = getProductPrice(item.art_number);
+        const price = Number(item.unit_price ?? 0);
         return sum + price * Number(item.quantity);
     }, 0);
 
