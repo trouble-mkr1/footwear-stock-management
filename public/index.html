@@ -156,8 +156,16 @@
                         placeholder="Enter Quantity"
                         required>
                    
-                    <button type="submit">Add Stock</button>
-                    <button type="button" id="add-new-product-button">+Add New Product</button>
+                    
+                    <button type = "submit">Add Stock</button>
+
+                    <button type = "button" id = "add-new-variant-button">
+                        + Add New Colour
+                    </button>
+
+                    <button type = "button" id = "add-new-product-button">
+                        + Add New Product
+                    </button>
                 </form>
             </div>
             
@@ -231,6 +239,69 @@
                 </form>
 
             </div>
+
+
+            <!-- Add New Colour Variant -->
+            <div id = "add-new-variant-form" class = "hidden">
+                <h2>ADD NEW COLOUR VARIANT</h2>
+
+                <form id = "new-variant-form">
+
+                    <label for = "variant-art-number">Art Number</label>
+                    <input
+                        type = "text"
+                        id = "variant-art-number"
+                        placeholder = "Enter Existing Art Number"
+                        required
+                    >
+
+                    <label for = "variant-colour">New Colour</label>
+                    <input
+                        type = "text"
+                        id = "variant-colour"
+                        placeholder = "Enter New Colour"
+                        required
+                    >
+
+                    <label for = "variant-size">Size</label>
+                    <input
+                        type = "number"
+                        id = "variant-size"
+                        min = "1"
+                        placeholder = "Enter Size"
+                        required
+                    >
+
+                    <label for = "variant-quantity">Initial Quantity</label>
+                    <input
+                        type = "number"
+                        id = "variant-quantity"
+                        min = "1"
+                        step = "1"
+                        placeholder = "Enter Quantity"
+                        required
+                    >
+
+                    <label for = "variant-image">Product Image</label>
+                    <input
+                        type = "file"
+                        id = "variant-image"
+                        accept = "image/jpeg,image/png,image/webp"
+                        required
+                    >
+
+                    <img
+                        id = "variant-image-preview"
+                        class = "image-preview hidden"
+                        alt = "New colour image preview"
+                    >
+
+                    <button type = "submit">Add Colour</button>
+                    <button type = "button" id = "cancel-new-variant">Cancel</button>
+
+                </form>
+            </div>
+
 
             <!--ORDER-PAGE LAYOUt-->
             <div id="orders-page" class="hidden">

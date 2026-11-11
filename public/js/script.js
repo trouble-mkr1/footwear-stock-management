@@ -223,6 +223,15 @@ stockForm.addEventListener("submit",handleAddStock);
 
 const addNewProductButton=document.getElementById("add-new-product-button");
 const addNewProductForm=document.getElementById("add-new-product-form");
+
+// Add New Colour Variant
+const addNewVariantButton = document.getElementById("add-new-variant-button");
+const addNewVariantForm = document.getElementById("add-new-variant-form");
+
+addNewVariantButton.addEventListener("click", () => {
+    addStockForm.classList.add("hidden");
+    addNewVariantForm.classList.remove("hidden");
+});
 addNewProductButton.addEventListener("click",()=>{
     addStockForm.classList.add("hidden");
     addNewProductForm.classList.remove("hidden");
@@ -660,4 +669,99 @@ productButton.addEventListener("click", () => {
     productsContainer.classList.remove("hidden");
 
     updateActiveNav(productButton);
+});
+
+
+// Add New Colour Variant functionality
+
+const newVariantForm = document.getElementById("new-variant-form");
+const variantImage = document.getElementById("variant-image");
+const variantImagePreview = document.getElementById("variant-image-preview");
+const cancelNewVariant = document.getElementById("cancel-new-variant");
+
+variantImage.addEventListener("change", () => {
+    const file = variantImage.files[0];
+
+    if (file) {
+        const reader = new FileReader();
+
+        reader.onload = (event) => {
+            variantImagePreview.src = event.target.result;
+            variantImagePreview.classList.remove("hidden");
+        };
+
+        reader.readAsDataURL(file);
+    }
+});
+
+cancelNewVariant.addEventListener("click", () => {
+    newVariantForm.reset();
+    variantImagePreview.src = "";
+    variantImagePreview.classList.add("hidden");
+
+    addNewVariantForm.classList.add("hidden");
+    addStockForm.classList.remove("hidden");
+});
+
+newVariantForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const artNumber = document.getElementById("variant-art-number").value.trim();
+    const colour = document.getElementById("variant-colour").value.trim();
+    const size = document.getElementById("variant-size").value;
+    const quantity = document.getElementById("variant-quantity").value;
+    const image = variantImage.files[0];
+
+    if (!artNumber || !colour || !size || !quantity || !image) {
+        alert("Please fill all fields.");
+        return;
+    }
+
+    if (!Number.isInteger(Number(size)) || Number(size) <= 0) {
+        alert("Size must be a positive whole number.");
+        return;
+    }
+
+    if (!Number.isInteger(Number(quantity)) || Number(quantity) <= 0) {
+        alert("Quantity must be a positive whole number.");
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+
+        formData.append("colour", colour);
+        formData.append("size", size);
+        formData.append("quantity", quantity);
+        formData.append("image", image);
+
+        const response = await fetch(
+            `/api/products/${encodeURIComponent(artNumber)}/variants`,
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || "Failed to add colour.");
+        }
+
+        alert("New colour added successfully!");
+
+        newVariantForm.reset();
+        variantImagePreview.src = "";
+        variantImagePreview.classList.add("hidden");
+
+        addNewVariantForm.classList.add("hidden");
+        productsContainer.classList.remove("hidden");
+
+        await refreshProducts();
+
+    } catch (error) {
+        console.error("Add colour error:", error);
+        alert(error.message);
+    }
 });
