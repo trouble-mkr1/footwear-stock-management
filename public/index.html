@@ -219,6 +219,8 @@
                     <input
                         type="number"
                         id="new-quantity"
+                        min = "1"
+                        step = "1"
                         placeholder="Enter No.of Quantity"
                         required
                     >
@@ -226,7 +228,7 @@
                     <input
                         type="file"
                         id="new-image"
-                        accept="image/*"
+                        accept="image/jpeg,image/png,image/webp"
                         required
                     >
                     <img
@@ -326,9 +328,9 @@
                     <h2>ADD ORDERS</h2>
                 </div>
                 <form id="order-form">
-                    <lable for="order-company-name">
+                    <label for="order-company-name">
                         Company Name
-                    </lable>
+                    </label>
                     <input  
                         type="text"
                         id="order-company-name"
@@ -359,7 +361,9 @@
                         Size
                     </label>
                     <input  
-                        type="text"
+                        type="number"
+                        min = "1"
+                        step = "1"
                         class="order-size"
                         placeholder="Enter Size"
                         required
@@ -368,7 +372,9 @@
                         Quantity
                     </label>
                     <input  
-                        type="text"
+                        type="number"
+                        min = "1"
+                        step = "1"
                         class="order-quantity"
                         placeholder="Enter Quantity"
                         required

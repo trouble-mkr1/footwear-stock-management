@@ -1,29 +1,82 @@
-// fetch("/api/products")
-//     .then(response => response.json())
-//     .then(products => {
-
-//         const container = document.getElementById("products-container");
-
-//         container.innerHTML = "";
-
-//         products.forEach(product => {
-//             const productCard = document.createElement("div");
-
-//             productCard.innerHTML = `
-//                 <h2>Art No: ${product.art_number}</h2>
-//                 <p>Price: ₹${product.price}</p>
-//                 `;
-
-//             container.appendChild(productCard);
-//         });
-
-//     })
-//     .catch(error => {
-//         console.error("Error:", error);
-//     });
-
-//console.log("Footwear Stock Management loaded");
 console.log("Scripts running");
+
+
+
+// Reusable inline validation helper
+function addInlineValidation(input, validationRule) {
+    const errorMessage = document.createElement("small");
+    errorMessage.className = "field-error";
+    errorMessage.setAttribute("aria-live", "polite");
+
+    input.insertAdjacentElement("afterend", errorMessage);
+
+    function validate() {
+        const message = validationRule(input.value, input);
+
+        errorMessage.textContent = message;
+        input.classList.toggle("input-invalid", Boolean(message));
+        input.classList.toggle("input-valid", !message && input.value.trim() !== "");
+
+        return !message;
+    }
+
+    input.addEventListener("input", validate);
+    input.addEventListener("change", validate);
+
+    return validate;
+}
+
+function requiredText(value) {
+    return value.trim() ? "" : "This field is required.";
+}
+
+function positiveWholeNumber(value, fieldName) {
+    if (value.trim() === "") {
+        return `${fieldName} is required.`;
+    }
+
+    const number = Number(value);
+
+    if (!Number.isInteger(number) || number <= 0) {
+        return `${fieldName} must be a positive whole number.`;
+    }
+
+    return "";
+}
+
+function positiveDecimal(value, fieldName) {
+    if (value.trim() === "") {
+        return `${fieldName} is required.`;
+    }
+
+    const number = Number(value);
+
+    if (!Number.isFinite(number) || number <= 0) {
+        return `${fieldName} must be greater than zero.`;
+    }
+
+    return "";
+}
+
+function validateImageFile(file) {
+    if (!file) {
+        return "Please select an image.";
+    }
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+        return "Only JPG, PNG and WEBP images are allowed.";
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+        return "Image must be smaller than 5 MB.";
+    }
+
+    return "";
+}
+
+
 
 // Load Dashboard Summary
 function loadDashboard() {
@@ -218,11 +271,55 @@ addStockButton.addEventListener("click",()=>{
 
 
 
-const stockForm =document.getElementById("stock-form");
-stockForm.addEventListener("submit",handleAddStock);
+
+const stockForm = document.getElementById("stock-form");
+
+const validateStockArt = addInlineValidation(
+    document.getElementById("stock-art-number"),
+    requiredText
+);
+
+const validateStockColour = addInlineValidation(
+    document.getElementById("stock-colour"),
+    requiredText
+);
+
+const validateStockSize = addInlineValidation(
+    document.getElementById("stock-size"),
+    value => positiveWholeNumber(value, "Size")
+);
+
+const validateStockQuantity = addInlineValidation(
+    document.getElementById("stock-quantity"),
+    value => positiveWholeNumber(value, "Quantity")
+);
+
+function validateStockForm() {
+    return [
+        validateStockArt(),
+        validateStockColour(),
+        validateStockSize(),
+        validateStockQuantity()
+    ].every(Boolean);
+}
+
+stockForm.addEventListener("submit", handleAddStock);
+
 
 const addNewProductButton=document.getElementById("add-new-product-button");
 const addNewProductForm=document.getElementById("add-new-product-form");
+
+
+function returnToProductsPage() {
+    pageHead.classList.remove("hidden");
+    productsContainer.classList.remove("hidden");
+
+    addStockForm.classList.add("hidden");
+    addNewProductForm.classList.add("hidden");
+    addNewVariantForm.classList.add("hidden");
+    productDetails.classList.add("hidden");
+}
+
 
 // Add New Colour Variant
 const addNewVariantButton = document.getElementById("add-new-variant-button");
@@ -245,8 +342,7 @@ async function handleAddStock(event){
     const size=document.getElementById("stock-size").value;
     const quantity=document.getElementById("stock-quantity").value;
 
-    if(artNumber===""||colour===""||size===""||quantity===""){
-        alert("Please Fill All The Fields.");
+    if(!validateStockForm()){
         return;
     }
     try {
@@ -270,9 +366,9 @@ async function handleAddStock(event){
         alert("Stock Added Successfully!");
         await refreshProducts();
         stockForm.reset();
+        returnToProductsPage();
         
-        addStockForm.classList.add("hidden");
-        productsContainer.classList.remove("hidden");
+        
     }catch(error){
         console.error("Error:ADDING STOCK",error)
 
@@ -284,6 +380,54 @@ const newProductForm=document.getElementById("new-product-form");
 const newImage = document.getElementById("new-image");
 const imagePreview = document.getElementById("image-preview");
 const cancelNewProduct = document.getElementById("cancel-new-product");
+
+const validateNewArt = addInlineValidation(
+    document.getElementById("new-art-number"),
+    requiredText
+);
+
+const validateNewColour = addInlineValidation(
+    document.getElementById("new-colour"),
+    requiredText
+);
+
+const validateNewMrp = addInlineValidation(
+    document.getElementById("new-mrp"),
+    value => positiveDecimal(value, "MRP")
+);
+
+const validateNewPrice = addInlineValidation(
+    document.getElementById("new-price"),
+    value => positiveDecimal(value, "Unit Price")
+);
+
+const validateNewSize = addInlineValidation(
+    document.getElementById("new-size"),
+    value => positiveWholeNumber(value, "Size")
+);
+
+const validateNewQuantity = addInlineValidation(
+    document.getElementById("new-quantity"),
+    value => positiveWholeNumber(value, "Quantity")
+);
+
+const validateNewImage = addInlineValidation(
+    newImage,
+    () => validateImageFile(newImage.files[0])
+);
+
+function validateNewProductForm() {
+    return [
+        validateNewArt(),
+        validateNewColour(),
+        validateNewMrp(),
+        validateNewPrice(),
+        validateNewSize(),
+        validateNewQuantity(),
+        validateNewImage()
+    ].every(Boolean);
+}
+
 newImage.addEventListener("change", () => {
         const file = newImage.files[0];
         if(file) {
@@ -294,6 +438,7 @@ newImage.addEventListener("change", () => {
             };
             reader.readAsDataURL(file);
         }
+        validateNewImage();
     });
 
 cancelNewProduct.addEventListener("click", () => {
@@ -315,15 +460,7 @@ newProductForm.addEventListener("submit", async (event) => {
     const quantity = document.getElementById("new-quantity").value;
     const image = document.getElementById("new-image").files[0];
    
-    if(artNumber === "" ||
-        colour === "" ||
-        mrp === "" ||
-        price === "" ||
-        size === "" ||
-        quantity === ""||
-        !image
-    ){
-        alert("Please Fill all the Fields!!");
+    if(!validateNewProductForm()) {
         return;
     }
 
@@ -357,10 +494,12 @@ newProductForm.addEventListener("submit", async (event) => {
 
         newProductForm.reset();
 
-        addNewProductForm.classList.add("hidden");
-        productsContainer.classList.remove("hidden");
+        imagePreview.src = "";
+        imagePreview.classList.add("hidden");
 
         await refreshProducts();
+
+        returnToProductsPage();
     }catch(error) {
         console.error("Error!! Adding Products:",error);
         alert(error.message);
@@ -385,14 +524,17 @@ const ordersPage = document.getElementById("orders-page");
 const ordersContainer = document.getElementById("orders-container");
 const orderSearch = document.getElementById("order-search");
 
-orderSearch.addEventListener("input", () =>{
-    const searchText = orderSearch.value.toLowerCase();
-    const filteredOrder = allOrders.filter(order =>
-        order.company_name.toLowerCase().includes(searchText) ||
-        order.art_number.toLowerCase().includes(searchText)
+
+orderSearch.addEventListener("input", () => {
+    const searchText = orderSearch.value.trim().toLowerCase();
+
+    const filteredOrders = allOrders.filter(order =>
+        (order.company_name || "").toLowerCase().includes(searchText)
     );
-    displayOrders(filteredOrder);
+
+    displayOrders(filteredOrders);
 });
+
 
 const addOrderButton = document.getElementById("add-order-button");
 const addOrderForm = document.getElementById("add-order-form");
@@ -514,16 +656,33 @@ orderForm.addEventListener("submit", async (event) => {
     }
 });
 
+
 async function loadOrders() {
     try {
         const response = await fetch("/api/orders");
+
+        if (!response.ok) {
+            throw new Error("Failed to load orders.");
+        }
+
         const orders = await response.json();
-        displayOrders(orders);
-    }catch (error) {
+
+        allOrders = orders;
+
+        const searchText = orderSearch.value.trim().toLowerCase();
+
+        const filteredOrders = allOrders.filter(order =>
+            (order.company_name || "").toLowerCase().includes(searchText)
+        );
+
+        displayOrders(filteredOrders);
+
+    } catch (error) {
         console.error("ERROR IN LOADING ORDERS!!!", error);
-        ordersContainer.innerHTML = "Failed To Load Orders!!!";
+        ordersContainer.textContent = "Failed to load orders.";
     }
 }
+
 
 function displayOrders(orders) {
     ordersContainer.innerHTML = "";
@@ -639,9 +798,11 @@ function hideAllMainSections() {
     productDetails.classList.add("hidden");
     addStockForm.classList.add("hidden");
     addNewProductForm.classList.add("hidden");
+    addNewVariantForm.classList.add("hidden");
     ordersPage.classList.add("hidden");
     addOrderForm.classList.add("hidden");
     orderDetailsPage.classList.add("hidden");
+    
 }
 
 // Update the active sidebar button
@@ -679,6 +840,45 @@ const variantImage = document.getElementById("variant-image");
 const variantImagePreview = document.getElementById("variant-image-preview");
 const cancelNewVariant = document.getElementById("cancel-new-variant");
 
+
+
+const validateVariantArt = addInlineValidation(
+    document.getElementById("variant-art-number"),
+    requiredText
+);
+
+const validateVariantColour = addInlineValidation(
+    document.getElementById("variant-colour"),
+    requiredText
+);
+
+const validateVariantSize = addInlineValidation(
+    document.getElementById("variant-size"),
+    value => positiveWholeNumber(value, "Size")
+);
+
+const validateVariantQuantity = addInlineValidation(
+    document.getElementById("variant-quantity"),
+    value => positiveWholeNumber(value, "Quantity")
+);
+
+const validateVariantImage = addInlineValidation(
+    variantImage,
+    () => validateImageFile(variantImage.files[0])
+);
+
+function validateNewVariantForm() {
+    return [
+        validateVariantArt(),
+        validateVariantColour(),
+        validateVariantSize(),
+        validateVariantQuantity(),
+        validateVariantImage()
+    ].every(Boolean);
+}
+
+
+
 variantImage.addEventListener("change", () => {
     const file = variantImage.files[0];
 
@@ -692,16 +892,20 @@ variantImage.addEventListener("change", () => {
 
         reader.readAsDataURL(file);
     }
+
+    validateVariantImage();
 });
+
 
 cancelNewVariant.addEventListener("click", () => {
     newVariantForm.reset();
+
     variantImagePreview.src = "";
     variantImagePreview.classList.add("hidden");
 
-    addNewVariantForm.classList.add("hidden");
-    addStockForm.classList.remove("hidden");
+    returnToProductsPage();
 });
+
 
 newVariantForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -712,18 +916,7 @@ newVariantForm.addEventListener("submit", async (event) => {
     const quantity = document.getElementById("variant-quantity").value;
     const image = variantImage.files[0];
 
-    if (!artNumber || !colour || !size || !quantity || !image) {
-        alert("Please fill all fields.");
-        return;
-    }
-
-    if (!Number.isInteger(Number(size)) || Number(size) <= 0) {
-        alert("Size must be a positive whole number.");
-        return;
-    }
-
-    if (!Number.isInteger(Number(quantity)) || Number(quantity) <= 0) {
-        alert("Quantity must be a positive whole number.");
+    if (!validateNewVariantForm()) {
         return;
     }
 
@@ -755,10 +948,10 @@ newVariantForm.addEventListener("submit", async (event) => {
         variantImagePreview.src = "";
         variantImagePreview.classList.add("hidden");
 
-        addNewVariantForm.classList.add("hidden");
-        productsContainer.classList.remove("hidden");
 
         await refreshProducts();
+
+        returnToProductsPage();
 
     } catch (error) {
         console.error("Add colour error:", error);

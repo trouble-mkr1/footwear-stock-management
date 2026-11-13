@@ -467,3 +467,22 @@ body {
         flex-direction: column;
     }
 }
+
+
+/* Inline form validation messages */
+.field-error {
+    display: block;
+    color: #dc3545;
+    font-size: 13px;
+    margin-top: 5px;
+    min-height: 16px;
+}
+
+.input-invalid {
+    border: 1px solid #dc3545 !important;
+    outline: none;
+}
+
+.input-valid {
+    border: 1px solid #198754 !important;
+}
