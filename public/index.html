@@ -11,7 +11,15 @@
 <body>
 
     <header class="topbar">
-        <h1>FOOTWEAR STOCK MANAGEMENT</h1>
+        <h1>HAWA TRAADERS FOOTWEAR STOCK MANAGEMENT</h1>
+
+        <button
+            type = "button"
+            id = "logout-button"
+            class = "logout-button"
+        >
+            LOG OUT
+        </button>
     </header>
 
     <div class="app-container">
@@ -119,7 +127,7 @@
             <!--Adding Stock-->
             <div id="add-stock-form" class="hidden">
                 <h2>Add Stock</h2>
-                <form id="stock-form">
+                <form id="stock-form" novalidate>
                     <label for="stock-art-number">Art Number</label>
                     <input 
                     type="text"
@@ -173,7 +181,7 @@
             <!--New Product Catalouge-->
             <div id="add-new-product-form" class="hidden">
                 <h2>ADD NEW PRODUCT</h2>
-                <form id="new-product-form">
+                <form id="new-product-form" novalidate>
                     <label for="new-art-number">Art Number</label>
                     <input
                         type="text"
@@ -247,7 +255,7 @@
             <div id = "add-new-variant-form" class = "hidden">
                 <h2>ADD NEW COLOUR VARIANT</h2>
 
-                <form id = "new-variant-form">
+                <form id = "new-variant-form" novalidate>
 
                     <label for = "variant-art-number">Art Number</label>
                     <input
@@ -412,6 +420,7 @@
 
     </div>
 
+    <script src = "/js/auth.js"></script>
     <script src="/js/script.js"></script>
 
 </body>

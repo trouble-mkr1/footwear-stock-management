@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+<html lang = "en">
+
+<head>
+    <meta charset = "UTF-8">
+    <meta name = "viewport" content = "width=device-width, initial-scale=1.0">
+    <title>Admin Login - HAWA traders</title>
+    <link rel = "stylesheet" href = "/css/style.css">
+
+    <style>
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            padding: 35px;
+            background: #101827;
+            border: 1px solid #334155;
+            border-radius: 14px;
+        }
+
+        .login-card h2 {
+            color: #39FF14;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .login-subtitle {
+            color: #94A3B8;
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .login-card form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .login-card label {
+            font-weight: bold;
+            color: #CBD5E1;
+        }
+
+        .login-card input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .login-card button {
+            padding: 13px;
+            border: none;
+            border-radius: 6px;
+            background: #39FF14;
+            color: #080B12;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .login-card button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #login-error {
+            min-height: 20px;
+            color: #ff7777;
+            text-align: center;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <main class = "login-page">
+        <section class = "login-card">
+
+            <h2>HAWA TRADERS FOOTWEAR STOCK MANAGEMENT</h2>
+
+            <p class = "login-subtitle">Admin Login</p>
+
+            <form id = "login-form">
+
+                <label for = "username">Username</label>
+                <input
+                    type = "text"
+                    id = "username"
+                    name = "username"
+                    autocomplete = "username"
+                    required
+                >
+
+                <label for = "password">Password</label>
+                <input
+                    type = "password"
+                    id = "password"
+                    name = "password"
+                    autocomplete = "current-password"
+                    required
+                >
+
+                <p id = "login-error" role = "alert"></p>
+
+                <button type = "submit" id = "login-button">
+                    LOGIN
+                </button>
+
+            </form>
+
+        </section>
+    </main>
+
+    <script src = "/js/login.js"></script>
+
+</body>
+</html>

@@ -26,6 +26,16 @@ function addInlineValidation(input, validationRule) {
     return validate;
 }
 
+function clearInlineValidation(form) {
+    form.querySelectorAll(".field-error").forEach(error => {
+        error.remove();
+    });
+
+    form.querySelectorAll(".input-invalid, .input-valid").forEach(input => {
+        input.classList.remove("input-invalid", "input-valid");
+    });
+}
+
 function requiredText(value) {
     return value.trim() ? "" : "This field is required.";
 }
@@ -111,67 +121,100 @@ loadDashboard();
 let allProducts = [];
 
 fetch("/api/products")
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error("Failed to load products.");
+        }
+
+        return response.json();
+    })
     .then(products => {
         allProducts = products;
         displayProducts(products);
     })
     .catch(error => {
         console.error("Error Loading Products:", error);
+        document.getElementById("products-container").textContent =
+            "Failed to load products. Please refresh the page.";
     });
 
 async function refreshProducts() {
     try {
-        const response=await fetch("/api/products");
-        const products=await response.json();
-        allProducts=products;
+        const response = await fetch("/api/products");
+
+        if (!response.ok) {
+            throw new Error("Failed to refresh products.");
+        }
+
+        const products = await response.json();
+
+        allProducts = products;
         displayProducts(products);
-    } catch(error){
-        console.error("Error in Refreshing Products!! ",error);
+
+    } catch (error) {
+        console.error("Error in Refreshing Products:", error);
+        alert(error.message || "Unable to refresh products.");
     }
 }
 
-function displayProducts(products){
-    const container=document.getElementById("products-container");
-    container.innerHTML="";
-    if(products.length===0){//if table is empty or does not contain the value  
-        container.innerHTML="<p>'No Products Found'</p>";
+function displayProducts(products) {
+    const container = document.getElementById("products-container");
+    container.replaceChildren();
+
+    if (!products || products.length === 0) {
+        const message = document.createElement("p");
+        message.textContent = "No Products Found";
+        container.appendChild(message);
         return;
     }
-    products.forEach(product=>{
-        let totalstock=0;
-        let image="";
-        product.variants.forEach(variant=>{
-            image=variant.image;
-            variant.stock.forEach(stockItem=>{
-                totalstock+=Number(stockItem.quantity);
+
+    products.forEach(product => {
+        let totalStock = 0;
+        let image = "";
+
+        product.variants.forEach(variant => {
+            image = variant.image;
+
+            variant.stock.forEach(stockItem => {
+                totalStock += Number(stockItem.quantity);
             });
         });
-        const card=document.createElement("div");
-        card.className="product-card";
-        card.innerHTML=`
-            <img
-                src="/images/${image}"
-                alt="Footwear ${product.art_number}"
-                class="product-image"
-            >
-            <div class="product-info">
-                <h3>Art No: ${product.art_number}</h3>
-                <p>MRP: ₹${product.mrp ?? "Not Set"}</p>
-                <p>Unit Price: ₹${product.price}</p>
-                <p>
-                    ${
-                        totalstock>0
-                        ?`Available Stock: ${totalstock}`
-                        :"Out of Stock"
-                    }
-               </p>
-            </div>
-        `;
-        card.addEventListener("click",()=>{
-            console.log("product:",product);
+
+        const card = document.createElement("div");
+        card.className = "product-card";
+
+        const productImage = document.createElement("img");
+        productImage.className = "product-image";
+        productImage.alt = `Footwear ${product.art_number}`;
+
+        if (image) {
+            productImage.src = `/images/${encodeURIComponent(image)}`;
+        }
+
+        const info = document.createElement("div");
+        info.className = "product-info";
+
+        const artNumber = document.createElement("h3");
+        artNumber.textContent = `Art No: ${product.art_number}`;
+
+        const mrp = document.createElement("p");
+        mrp.textContent = `MRP: ₹${product.mrp ?? "Not Set"}`;
+
+        const price = document.createElement("p");
+        price.textContent = `Unit Price: ₹${product.price}`;
+
+        const stock = document.createElement("p");
+        stock.textContent = totalStock > 0
+            ? `Available Stock: ${totalStock}`
+            : "Out of Stock";
+
+        info.append(artNumber, mrp, price, stock);
+        card.append(productImage, info);
+
+        card.addEventListener("click", () => {
             showProductDetails(product);
         });
+
         container.appendChild(card);
     });
 }
@@ -207,27 +250,35 @@ function showProductDetails(product){
 
 }
 //fetching variant details 
-function showVariant(selectedVariant,allVariants){
-    const image=document.getElementById("details-image");
-    image.src=`/images/${selectedVariant.image}`;
-    const tableBody=document.getElementById("stock-table-body");
-    tableBody.innerHTML="";
-    selectedVariant.stock.forEach(stockItem=>{
-        const row=document.createElement("tr");
+function showVariant(selectedVariant, allVariants) {
+    const image = document.getElementById("details-image");
+    const tableBody = document.getElementById("stock-table-body");
 
-        row.innerHTML=`
-        <td>${stockItem.size}</td>
-        <td>${stockItem.quantity}</td>
-        `;
+    image.src = selectedVariant.image
+        ? `/images/${encodeURIComponent(selectedVariant.image)}`
+        : "";
+
+    tableBody.replaceChildren();
+
+    selectedVariant.stock.forEach(stockItem => {
+        const row = document.createElement("tr");
+
+        const sizeCell = document.createElement("td");
+        sizeCell.textContent = stockItem.size;
+
+        const quantityCell = document.createElement("td");
+        quantityCell.textContent = stockItem.quantity;
+
+        row.append(sizeCell, quantityCell);
         tableBody.appendChild(row);
     });
 
-    //upadting active colour button
-    const buttons=document.querySelectorAll(".colour-button");
-    buttons.forEach(button=>{
+    const buttons = document.querySelectorAll(".colour-button");
+
+    buttons.forEach(button => {
         button.classList.toggle(
             "active-colour",
-            button.textContent===selectedVariant.colour
+            button.textContent === selectedVariant.colour
         );
     });
 }
@@ -366,6 +417,7 @@ async function handleAddStock(event){
         alert("Stock Added Successfully!");
         await refreshProducts();
         stockForm.reset();
+        clearInlineValidation(stockForm);
         returnToProductsPage();
         
         
@@ -443,10 +495,13 @@ newImage.addEventListener("change", () => {
 
 cancelNewProduct.addEventListener("click", () => {
     newProductForm.reset();
+
     imagePreview.src = "";
     imagePreview.classList.add("hidden");
-    addNewProductForm.classList.add("hidden");
-    productsContainer.classList.remove("hidden");
+
+    clearInlineValidation(newProductForm);
+
+    returnToProductsPage();
 });
 
 newProductForm.addEventListener("submit", async (event) => {
@@ -493,6 +548,7 @@ newProductForm.addEventListener("submit", async (event) => {
         alert("Product Added Sucessfully...");
 
         newProductForm.reset();
+        clearInlineValidation(newProductForm);
 
         imagePreview.src = "";
         imagePreview.classList.add("hidden");
@@ -510,13 +566,21 @@ newProductForm.addEventListener("submit", async (event) => {
 let allOrders = [];
 
 fetch("/api/orders")
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error("Failed to load orders.");
+        }
+
+        return response.json();
+    })
     .then(orders => {
         allOrders = orders;
         displayOrders(orders);
     })
     .catch(error => {
-        console.error("Error Loading Orders", error);
+        console.error("Error Loading Orders:", error);
+        document.getElementById("orders-container").textContent =
+            "Failed to load orders. Please try again.";
     });
 
 const ordersButton = document.getElementById("orders-button");
@@ -571,50 +635,78 @@ cancelOrder.addEventListener("click", () => {
 addOrderItemButton.addEventListener("click", () => {
     const newItem = document.createElement("div");
     newItem.classList.add("order-item");
-    newItem.innerHTML = `<label> Art No: <label>
-    <input 
-        type = "text"
-        class = "order-art-number"
-        placeholder = "Enter Art Number"
-        required
-    >   
-    <label> Colour: <label>
-    <input
-        type = "text"
-        class = "order-colour"
-        placeholder = "Enter Colour"
-        required
-    >
-    <label> Size: <label>
-    <input
-        type = "number" 
-        class = "order-size"
-        placeholder = "Enter Size"
-        required
-    >
-    <label> Quantity: <label>
-    <input
-        type = "number"
-        class = "order-quantity"
-        placeholder = "Enter Quantity"
-        required
-    > 
+
+    newItem.innerHTML = `
+        <label>Art No</label>
+        <input
+            type="text"
+            class="order-art-number"
+            placeholder="Enter Art Number"
+            required
+        >
+
+        <label>Colour</label>
+        <input
+            type="text"
+            class="order-colour"
+            placeholder="Enter Colour"
+            required
+        >
+
+        <label>Size</label>
+        <input
+            type="number"
+            class="order-size"
+            min="1"
+            step="1"
+            placeholder="Enter Size"
+            required
+        >
+
+        <label>Quantity</label>
+        <input
+            type="number"
+            class="order-quantity"
+            min="1"
+            step="1"
+            placeholder="Enter Quantity"
+            required
+        >
+
+        <button type="button" class="remove-order-item">
+            Remove Item
+        </button>
     `;
+
     orderItemsContainer.appendChild(newItem);
+});
+
+orderItemsContainer.addEventListener("click", event => {
+    const removeButton = event.target.closest(".remove-order-item");
+
+    if (!removeButton) {
+        return;
+    }
+
+    const item = removeButton.closest(".order-item");
+
+    if (item) {
+        item.remove();
+    }
 });
 
 orderForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const companyName = document.getElementById("order-company-name").value;
-    const address = document.getElementById("order-address").value;
+    const companyName = document.getElementById("order-company-name").value.trim();
+    const address = document.getElementById("order-address").value.trim();
     const orderItems = document.querySelectorAll(".order-item");
     const items = [];
     orderItems.forEach(item => {
-        const artNumber = item.querySelector(".order-art-number").value;
-        const colour = item.querySelector(".order-colour").value;
-        const size = item.querySelector(".order-size").value;
-        const quantity = item.querySelector(".order-quantity").value;
+        const artNumber = item.querySelector(".order-art-number").value.trim();
+        const colour = item.querySelector(".order-colour").value.trim();
+        const size = Number(item.querySelector(".order-size").value);
+        const quantity = Number(item.querySelector(".order-quantity").value);
 
         items.push({
             art_number: artNumber,
@@ -645,6 +737,13 @@ orderForm.addEventListener("submit", async (event) => {
         }
         alert("Order Added Sucessfully..");
         orderForm.reset();
+
+        // Remove additional item rows after successful order creation
+        orderItemsContainer.querySelectorAll(".order-item").forEach((item, index) => {
+            if (index > 0) {
+                item.remove();
+            }
+        });
 
         addOrderForm.classList.add("hidden");
         ordersPage.classList.remove("hidden");
@@ -685,103 +784,154 @@ async function loadOrders() {
 
 
 function displayOrders(orders) {
-    ordersContainer.innerHTML = "";
-    if (orders.length === 0){
-        ordersContainer.innerHTML = "<p>NO Pending Orders.</p>";
+    ordersContainer.replaceChildren();
+
+    if (!orders || orders.length === 0) {
+        const message = document.createElement("p");
+        message.textContent = "No Pending Orders.";
+        ordersContainer.appendChild(message);
         return;
     }
+
     orders.forEach(order => {
         const orderCard = document.createElement("div");
         orderCard.classList.add("order-card");
-        orderCard.innerHTML = `
-        <div class="order-info"> 
-            <h3 class="order-company-name" data-id="${order.id}">
-            ${order.company_name}
-            </h3>
-            <p>Address: ${order.address}</p>
-            <p>Status: ${order.status}</p>
-        </div>
-        <button class="complete-order-button" data-id="${order.id}">COMPLETE</button>    
-        `;
+
+        const orderInfo = document.createElement("div");
+        orderInfo.className = "order-info";
+
+        const companyName = document.createElement("h3");
+        companyName.className = "order-company-name";
+        companyName.dataset.id = order.id;
+        companyName.textContent = order.company_name || "Unnamed Company";
+
+        const address = document.createElement("p");
+        address.textContent = `Address: ${order.address || "Not provided"}`;
+
+        const status = document.createElement("p");
+        status.textContent = `Status: ${order.status || "Unknown"}`;
+
+        const completeButton = document.createElement("button");
+        completeButton.className = "complete-order-button";
+        completeButton.dataset.id = order.id;
+        completeButton.textContent = "COMPLETE";
+
+        orderInfo.append(companyName, address, status);
+        orderCard.append(orderInfo, completeButton);
+
         ordersContainer.appendChild(orderCard);
     });
 }
 
 ordersContainer.addEventListener("click", async (event) => {
-    if(!event.target.classList.contains("order-company-name")) {
+    const companyName = event.target.closest(".order-company-name");
+
+    if (!companyName || !ordersContainer.contains(companyName)) {
         return;
     }
 
-    const orderId = event.target.dataset.id;
+    const orderId = companyName.dataset.id;
     await loadOrderDetails(orderId);
-})
+});
 
 async function loadOrderDetails(orderId) {
     try {
-        const response = await fetch(`/api/orders/${orderId}`);
+        const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}`);
 
         const order = await response.json();
-        if(!response.ok) {
-            alert(order.error || "Failed To Load Order Detalis!!");
-            return;
+
+        if (!response.ok) {
+            throw new Error(order.error || "Failed to load order details.");
         }
-        orderDetailsContainer.innerHTML = `
-        <div class="order-deatls-card">
-            <h3>${order.company_name}</h3>
-             <p><strong>Address:</strong>
-                ${order.address}</p>
-            <p><strong>Status:</strong>
-                ${order.status}</p>
-            <h4>Order Items:</h4>
-            <div class="order-items-list">
-                ${order.items.map(item =>`
-                     <div class="order-items-details">
-                        <p><strong>Art No:</strong>
-                         ${item.art_number}</p>
-                        <p><strong>Colour:</strong>
-                            ${item.colour}</p>
-                        <p><strong>Size:</strong>
-                            ${item.size}</p>
-                        <p><strong>Quantity:</strong>
-                            ${item.quantity}</p>
-            </div>
-            `).join("")};    
-        </div>
-         `;
+
+        orderDetailsContainer.replaceChildren();
+
+        const detailsCard = document.createElement("div");
+        detailsCard.className = "order-deatls-card";
+
+        const companyName = document.createElement("h3");
+        companyName.textContent = order.company_name || "Unnamed Company";
+
+        const address = document.createElement("p");
+        address.textContent = `Address: ${order.address || "Not provided"}`;
+
+        const status = document.createElement("p");
+        status.textContent = `Status: ${order.status || "Unknown"}`;
+
+        const itemsHeading = document.createElement("h4");
+        itemsHeading.textContent = "Order Items:";
+
+        const itemsList = document.createElement("div");
+        itemsList.className = "order-items-list";
+
+        (order.items || []).forEach(item => {
+            const itemDetails = document.createElement("div");
+            itemDetails.className = "order-items-details";
+
+            const art = document.createElement("p");
+            art.textContent = `Art No: ${item.art_number}`;
+
+            const colour = document.createElement("p");
+            colour.textContent = `Colour: ${item.colour}`;
+
+            const size = document.createElement("p");
+            size.textContent = `Size: ${item.size}`;
+
+            const quantity = document.createElement("p");
+            quantity.textContent = `Quantity: ${item.quantity}`;
+
+            itemDetails.append(art, colour, size, quantity);
+            itemsList.appendChild(itemDetails);
+        });
+
+        detailsCard.append(
+            companyName,
+            address,
+            status,
+            itemsHeading,
+            itemsList
+        );
+
+        orderDetailsContainer.appendChild(detailsCard);
+
         ordersPage.classList.add("hidden");
         addOrderForm.classList.add("hidden");
         orderDetailsPage.classList.remove("hidden");
-    } catch(error) {
+
+    } catch (error) {
         console.error("ERROR: IN LOADING DETAILS!!!", error);
-        alert("Something Went Wrong While Loading Details.");
+        alert(error.message || "Something went wrong while loading details.");
     }
 }
 
 
 ordersContainer.addEventListener("click", async (event) => {
-    if(!event.target.classList.contains("complete-order-button")) {
+    const completeButton = event.target.closest(".complete-order-button");
+
+    if (!completeButton || !ordersContainer.contains(completeButton)) {
         return;
     }
 
-    const orderId = event.target.dataset.id;
+    const orderId = completeButton.dataset.id;
 
     try {
-        const respone = await fetch(`/api/orders/${orderId}/complete`, {
+        const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/complete`, {
             method: "PUT"
         });
 
-        const data = await respone.json();
-        if(!respone.ok) {
-            alert(data.error || "Failed To Complete Orders!!");
-            return;
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Failed to complete order.");
         }
 
-        alert("Order Completed Successfully..");
+        alert("Order Completed Successfully!");
 
-        loadOrders();
+        await loadOrders();
+
     } catch (error) {
         console.error("ERROR: IN COMPLETING ORDER!!!", error);
-        alert("Something Went Wrong While Completing The Order..");
+        alert(error.message || "Something went wrong while completing the order.");
     }
 });
 
@@ -899,6 +1049,7 @@ variantImage.addEventListener("change", () => {
 
 cancelNewVariant.addEventListener("click", () => {
     newVariantForm.reset();
+    clearInlineValidation(newVariantForm);
 
     variantImagePreview.src = "";
     variantImagePreview.classList.add("hidden");
@@ -945,6 +1096,7 @@ newVariantForm.addEventListener("submit", async (event) => {
         alert("New colour added successfully!");
 
         newVariantForm.reset();
+        clearInlineValidation(newVariantForm);
         variantImagePreview.src = "";
         variantImagePreview.classList.add("hidden");
 

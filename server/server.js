@@ -1,10 +1,31 @@
+require("dotenv").config();
+
 const express = require("express");
 const pool = require("./db");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
+const session = require("express-session");
+const PgSession = require("connect-pg-simple")(session);
+const bcrypt = require("bcryptjs");
+const { rateLimit } = require("express-rate-limit");
+
 const app = express();
+
+const publicDir = path.join(__dirname, "../public");
+
+if (!process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET is missing from .env");
+}
+
+if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD_HASH) {
+    throw new Error("Admin credentials are missing from .env");
+}
+
+if (process.env.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
+}
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -12,8 +33,8 @@ const storage = multer.diskStorage({
     },
 
     filename: (req, file, cb) => {
-        const extension = path.extname(file.originalname).toLowerCase();
-        cb(null, `${Date.now()}-${Math.round(Math.random() * 1E9)}${extension}`);
+        const filename = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+        cb(null, filename);
     }
 });
 
@@ -34,7 +55,7 @@ const upload = multer({
 }); 
 
 const uploadProductImage = (req, res, next) => {
-    upload.single("image")(req, res, (error) => {
+    upload.single("image")(req, res, async (error) => {
         if (error) {
             return res.status(400).json({
                 error: error.code === "LIMIT_FILE_SIZE"
@@ -43,9 +64,100 @@ const uploadProductImage = (req, res, next) => {
             });
         }
 
-        next();
+        // No image was uploaded.
+        // The route itself will handle the required-image validation.
+        if (!req.file) {
+            return next();
+        }
+
+        try {
+            const extension = await detectImageExtension(req.file.path);
+
+            if (!extension) {
+                deleteUploadedImage(req.file);
+
+                return res.status(400).json({
+                    error: "The uploaded file is not a valid JPG, PNG or WEBP image."
+                });
+            }
+
+            // Give the image a server-controlled extension.
+            const safeFilename = `${path.basename(req.file.filename)}.${extension}`;
+
+            const safePath = path.join(
+                path.dirname(req.file.path),
+                safeFilename
+            );
+
+            await fs.promises.rename(req.file.path, safePath);
+
+            req.file.filename = safeFilename;
+            req.file.path = safePath;
+
+            next();
+
+        } catch (verificationError) {
+            console.error("Image verification error:", verificationError);
+
+            deleteUploadedImage(req.file);
+
+            return res.status(500).json({
+                error: "Unable to verify the uploaded image."
+            });
+        }
     });
 };
+
+
+// function to verify if the uploaded image is a propper one(.png, webp, etc etc)
+async function detectImageExtension(filePath) {
+    const fileHandle = await fs.promises.open(filePath, "r");
+
+    try {
+        const header = Buffer.alloc(12);
+
+        const { bytesRead } = await fileHandle.read(
+            header,
+            0,
+            header.length,
+            0
+        );
+
+        // JPEG signature
+        if (
+            bytesRead >= 3 &&
+            header[0] === 0xFF &&
+            header[1] === 0xD8 &&
+            header[2] === 0xFF
+        ) {
+            return "jpg";
+        }
+
+        // PNG signature
+        if (
+            bytesRead >= 8 &&
+            header.subarray(0, 8).equals(
+                Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+            )
+        ) {
+            return "png";
+        }
+
+        // WEBP signature
+        if (
+            bytesRead >= 12 &&
+            header.toString("ascii", 0, 4) === "RIFF" &&
+            header.toString("ascii", 8, 12) === "WEBP"
+        ) {
+            return "webp";
+        }
+
+        return null;
+
+    } finally {
+        await fileHandle.close();
+    }
+}
 
 function deleteUploadedImage(file) {
     if (file) {
@@ -58,13 +170,197 @@ function deleteUploadedImage(file) {
 }
 
 
-app.use(express.json());
-// app.use(express.static("public"));
-app.use(express.static(path.join(__dirname, "../public")));
+async function rollbackQuietly(client) {
+    if (!client) {
+        return;
+    }
 
-app.get("/", (req, res) => {
-    res.send("Footwear Stock Management Server");
+    try {
+        await client.query("ROLLBACK");
+    } catch (rollbackError) {
+        console.error("Database rollback error:", rollbackError);
+    }
+}
+
+
+app.use(express.json({ limit: "100kb" }));
+
+// Serve public assets
+app.use("/css", express.static(path.join(publicDir, "css")));
+app.use("/js", express.static(path.join(publicDir, "js")));
+app.use("/images", express.static(path.join(publicDir, "images")));
+
+// PostgreSQL-backed login sessions
+app.use(session({
+    name: "footwear.sid",
+    secret: process.env.SESSION_SECRET,
+
+    store: new PgSession({
+        pool: pool,
+        tableName: "user_sessions",
+        createTableIfMissing: true
+    }),
+
+    resave: false,
+    saveUninitialized: false,
+
+    cookie: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 8 * 60 * 60 * 1000,
+        path: "/"
+    }
+}));
+
+
+function requireAdmin(req, res, next) {
+    if (req.session && req.session.isAdmin === true) {
+        return next();
+    }
+
+    return res.status(401).json({
+        error: "Authentication required. Please log in."
+    });
+}
+
+
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        error: "Too many login attempts. Please try again after 15 minutes."
+    }
 });
+
+
+// Check current login status
+app.get("/api/auth/session", (req, res) => {
+    res.json({
+        authenticated: Boolean(req.session?.isAdmin),
+        username: req.session?.adminUsername || null
+    });
+});
+
+
+// Admin login
+app.post("/api/auth/login", loginLimiter, async (req, res) => {
+    try {
+        const username = String(req.body?.username || "").trim();
+        const password = typeof req.body?.password === "string"
+            ? req.body.password
+            : "";
+
+        if (!username || !password) {
+            return res.status(400).json({
+                error: "Please enter your username and password."
+            });
+        }
+
+        if (username !== process.env.ADMIN_USERNAME) {
+            return res.status(401).json({
+                error: "Invalid username or password."
+            });
+        }
+
+        const passwordMatches = await bcrypt.compare(
+            password,
+            process.env.ADMIN_PASSWORD_HASH
+        );
+
+        if (!passwordMatches) {
+            return res.status(401).json({
+                error: "Invalid username or password."
+            });
+        }
+
+        req.session.regenerate(error => {
+            if (error) {
+                console.error("Session regeneration error:", error);
+
+                return res.status(500).json({
+                    error: "Unable to create login session."
+                });
+            }
+
+            req.session.isAdmin = true;
+            req.session.adminUsername = username;
+
+            req.session.save(saveError => {
+                if (saveError) {
+                    console.error("Session save error:", saveError);
+
+                    return res.status(500).json({
+                        error: "Unable to save login session."
+                    });
+                }
+
+                return res.json({
+                    message: "Login successful."
+                });
+            });
+        });
+
+    } catch (error) {
+        console.error("Admin login error:", error);
+
+        return res.status(500).json({
+            error: "Login failed. Please try again."
+        });
+    }
+});
+
+
+// Admin logout
+app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy(error => {
+        if (error) {
+            console.error("Logout error:", error);
+
+            return res.status(500).json({
+                error: "Unable to log out."
+            });
+        }
+
+        res.clearCookie("footwear.sid", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            path: "/"
+        });
+
+        return res.json({
+            message: "Logged out successfully."
+        });
+    });
+});
+
+
+// Main page: show login or admin dashboard
+app.get("/", (req, res) => {
+    res.set("Cache-Control", "no-store");
+    
+    if (req.session?.isAdmin) {
+        return res.sendFile(path.join(publicDir, "index.html"));
+    }
+
+    return res.sendFile(path.join(publicDir, "login.html"));
+});
+
+
+// Protect the billing page
+app.get("/billing.html", (req, res) => {
+    res.set("Cache-Control", "no-store");
+
+    if (!req.session?.isAdmin) {
+        return res.redirect("/");
+    }
+
+    return res.sendFile(path.join(publicDir, "billing.html"));
+});
+
 
 // app.get("/test-db", async (req, res) => {
 //     try {
@@ -76,7 +372,7 @@ app.get("/", (req, res) => {
 //     }
 // });
 
-app.get("/test-db", async (req, res) => {
+app.get("/test-db", requireAdmin, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT
@@ -90,6 +386,11 @@ app.get("/test-db", async (req, res) => {
         res.status(500).send("Database connection failed");
     }
 });
+
+
+// All API routes below this point require admin authentication
+app.use("/api", requireAdmin);
+
 
 app.get("/api/products", async (req, res) => {
     try {
@@ -405,9 +706,7 @@ app.post("/api/products", uploadProductImage, async (req, res) => {
         });
 
     } catch (error) {
-        if (client) {
-            await client.query("ROLLBACK");
-        }
+        await rollbackQuietly(client);
 
         deleteUploadedImage(req.file);
 
@@ -542,8 +841,8 @@ app.post("/api/products/:artNumber/variants", uploadProductImage, async (req, re
         });
 
     } catch (error) {
-        if (client && transactionStarted) {
-            await client.query("ROLLBACK");
+        if (transactionStarted) {
+            await rollbackQuietly(client);
         }
 
         deleteUploadedImage(req.file);
@@ -764,9 +1063,7 @@ app.post("/api/orders", async (req, res) => {
         });
 
     } catch (error) {
-        if (client) {
-            await client.query("ROLLBACK");
-        }
+        await rollbackQuietly(client);
 
         console.error("Add order error:", error);
 
