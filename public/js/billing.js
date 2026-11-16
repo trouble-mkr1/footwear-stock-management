@@ -20,11 +20,14 @@ async function loadBillingData() {
         orderSelect.innerHTML = '<option value = "">Select an order</option>';
 
         billingOrders.forEach(order => {
+
             const option = document.createElement("option");
+
             option.value = order.id;
-            option.textContent = 
-                `Order #${order.id} - ${order.company_name} (${order.status})`;
-            
+
+            option.textContent =
+                `#${order.id} | ${order.company_name} | ${order.address || "No address"} | ${order.status}`;
+
             orderSelect.appendChild(option);
         });
 

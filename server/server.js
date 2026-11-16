@@ -183,6 +183,96 @@ async function rollbackQuietly(client) {
 }
 
 
+
+// Validate and standardise order items
+function validateOrderItems(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+        const error = new Error("An order must contain at least one item.");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    return items.map(item => {
+        const artNumber = String(item.art_number || "").trim();
+        const colour = String(item.colour || "").trim();
+        const size = Number(item.size);
+        const quantity = Number(item.quantity);
+
+        if (
+            !artNumber ||
+            !colour ||
+            item.size === undefined ||
+            item.size === "" ||
+            item.quantity === undefined ||
+            item.quantity === ""
+        ) {
+            const error = new Error(
+                "Every item must have an art number, colour, size and quantity."
+            );
+            error.statusCode = 400;
+            throw error;
+        }
+
+        if (!Number.isInteger(size) || size <= 0) {
+            const error = new Error(
+                `Invalid size for art number ${artNumber}.`
+            );
+            error.statusCode = 400;
+            throw error;
+        }
+
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+            const error = new Error(
+                `Invalid quantity for art number ${artNumber}.`
+            );
+            error.statusCode = 400;
+            throw error;
+        }
+
+        return {
+            artNumber,
+            colour,
+            size,
+            quantity
+        };
+    });
+}
+
+
+// Restore stock from an existing order
+async function restoreOrderStock(client, orderId) {
+
+    const itemsResult = await client.query(
+        `SELECT
+            pv.id AS variant_id,
+            oi.size,
+            oi.quantity
+         FROM order_items oi
+         JOIN product_variant pv
+            ON pv.art_number = oi.art_number
+            AND LOWER(TRIM(pv.colour)) = LOWER(TRIM(oi.colour))
+         WHERE oi.order_id = $1`,
+        [orderId]
+    );
+
+    for (const item of itemsResult.rows) {
+
+        await client.query(
+            `INSERT INTO stock (variant_id, size, quantity)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (variant_id, size)
+             DO UPDATE SET
+                quantity = stock.quantity + EXCLUDED.quantity`,
+            [
+                item.variant_id,
+                item.size,
+                item.quantity
+            ]
+        );
+    }
+}
+
+
 app.use(express.json({ limit: "100kb" }));
 
 // Serve public assets
@@ -868,17 +958,342 @@ app.post("/api/products/:artNumber/variants", uploadProductImage, async (req, re
 
 
 //Orders-page
-app.get("/api/orders", async(req,res) => {
+app.get("/api/orders", async (req, res) => {
     try {
+        // Get all orders for the Orders page
         const result = await pool.query(`
-            select * from orders
-            where status='Pending'
+            SELECT
+                id,
+                company_name,
+                address,
+                status
+            FROM orders
             ORDER BY id DESC
         `);
-        res.json(result.rows);
-    }catch (error) {
-        console.log(error);
-        res.status(500).json({error: "Failed To Load Orders!!"});
+
+        return res.json(result.rows);
+
+    } catch (error) {
+        console.error("Load orders error:", error);
+
+        return res.status(500).json({
+            error: "Failed to load orders."
+        });
+    }
+});
+
+
+
+// Edit an existing pending order
+app.put("/api/orders/:id", async (req, res) => {
+
+    let client;
+
+    try {
+        const orderId = Number(req.params.id);
+
+        if (!Number.isInteger(orderId) || orderId <= 0) {
+            return res.status(400).json({
+                error: "Invalid order ID."
+            });
+        }
+
+        const companyName = String(req.body.company_name || "").trim();
+        const address = String(req.body.address || "").trim();
+
+        if (!companyName || !address) {
+            return res.status(400).json({
+                error: "Company name and address are required."
+            });
+        }
+
+        const validatedItems = validateOrderItems(req.body.items);
+
+        client = await pool.connect();
+
+        await client.query("BEGIN");
+
+        // Lock the order so it cannot be edited/deleted/completed
+        // simultaneously by another request.
+        const orderResult = await client.query(
+            `SELECT id, status
+             FROM orders
+             WHERE id = $1
+             FOR UPDATE`,
+            [orderId]
+        );
+
+        if (orderResult.rows.length === 0) {
+            await client.query("ROLLBACK");
+
+            return res.status(404).json({
+                error: "Order not found."
+            });
+        }
+
+        if (orderResult.rows[0].status !== "Pending") {
+            await client.query("ROLLBACK");
+
+            return res.status(409).json({
+                error: "Only pending orders can be edited."
+            });
+        }
+
+        // Read original item prices before removing the old order items
+        const previousItemsResult = await client.query(
+            `SELECT
+                art_number,
+                colour,
+                size,
+                unit_price,
+                mrp
+            FROM order_items
+            WHERE order_id = $1
+            ORDER BY id`,
+            [orderId]
+        );
+
+        // Store original prices using art number, colour and size
+        const previousPrices = new Map();
+
+        for (const oldItem of previousItemsResult.rows) {
+            const key = JSON.stringify([
+                String(oldItem.art_number).trim().toLowerCase(),
+                String(oldItem.colour).trim().toLowerCase(),
+                Number(oldItem.size)
+            ]);
+
+            if (!previousPrices.has(key)) {
+                previousPrices.set(key, {
+                    unit_price: oldItem.unit_price,
+                    mrp: oldItem.mrp
+                });
+            }
+        }
+
+        // Restore stock from the original order
+        await restoreOrderStock(client, orderId);
+
+        // Update the order's company information
+        await client.query(
+            `UPDATE orders
+             SET company_name = $1,
+                 address = $2
+             WHERE id = $3`,
+            [companyName, address, orderId]
+        );
+
+        // Remove the old order items
+        await client.query(
+            `DELETE FROM order_items
+             WHERE order_id = $1`,
+            [orderId]
+        );
+
+        // Insert the revised items and deduct their stock
+        for (const item of validatedItems) {
+
+            const variantResult = await client.query(
+                `SELECT
+                    pv.id,
+                    p.price,
+                    p.mrp
+                 FROM product_variant pv
+                 JOIN products p
+                    ON p.art_number = pv.art_number
+                 WHERE pv.art_number = $1
+                 AND LOWER(TRIM(pv.colour)) = LOWER($2)`,
+                [item.artNumber, item.colour]
+            );
+
+            if (variantResult.rows.length === 0) {
+                const error = new Error(
+                    `Product variant not found: ${item.artNumber} - ${item.colour}`
+                );
+                error.statusCode = 404;
+                throw error;
+            }
+
+            const variant = variantResult.rows[0];
+
+            if (variant.price === null || variant.price === undefined) {
+                const error = new Error(
+                    `Unit price is missing for product ${item.artNumber}.`
+                );
+                error.statusCode = 400;
+                throw error;
+            }
+
+            // Deduct stock only if sufficient quantity is available
+            const stockResult = await client.query(
+                `UPDATE stock
+                 SET quantity = quantity - $1
+                 WHERE variant_id = $2
+                 AND size = $3
+                 AND quantity >= $1
+                 RETURNING quantity`,
+                [
+                    item.quantity,
+                    variant.id,
+                    item.size
+                ]
+            );
+
+            if (stockResult.rows.length === 0) {
+                const error = new Error(
+                    `Insufficient stock: ${item.artNumber} - ${item.colour} - size ${item.size}`
+                );
+                error.statusCode = 409;
+                throw error;
+            }
+
+            // Find the original price if this item already existed
+            const priceKey = JSON.stringify([
+                item.artNumber.toLowerCase(),
+                item.colour.toLowerCase(),
+                item.size
+            ]);
+
+            const previousPrice = previousPrices.get(priceKey);
+
+            // Preserve old prices for existing items.
+            // Use current product prices only for newly added items.
+            const unitPrice = previousPrice
+                ? previousPrice.unit_price
+                : variant.price;
+
+            const itemMrp = previousPrice
+                ? previousPrice.mrp
+                : variant.mrp;
+
+            // Save the revised order item
+            await client.query(
+                `INSERT INTO order_items
+                (order_id, art_number, colour, size, quantity, unit_price, mrp)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [
+                    orderId,
+                    item.artNumber,
+                    item.colour,
+                    item.size,
+                    item.quantity,
+                    unitPrice,
+                    itemMrp
+                ]
+            );
+        }
+
+        await client.query("COMMIT");
+
+        return res.json({
+            message: "Order updated successfully.",
+            order_id: orderId
+        });
+
+    } catch (error) {
+
+        await rollbackQuietly(client);
+
+        console.error("Edit order error:", error);
+
+        return res.status(error.statusCode || 500).json({
+            error: error.statusCode
+                ? error.message
+                : "Failed to update order."
+        });
+
+    } finally {
+
+        if (client) {
+            client.release();
+        }
+    }
+});
+
+
+
+// Delete a pending order and restore its stock
+app.delete("/api/orders/:id", async (req, res) => {
+
+    let client;
+
+    try {
+        const orderId = Number(req.params.id);
+
+        if (!Number.isInteger(orderId) || orderId <= 0) {
+            return res.status(400).json({
+                error: "Invalid order ID."
+            });
+        }
+
+        client = await pool.connect();
+
+        await client.query("BEGIN");
+
+        // Lock the order before checking its status
+        const orderResult = await client.query(
+            `SELECT id, status
+             FROM orders
+             WHERE id = $1
+             FOR UPDATE`,
+            [orderId]
+        );
+
+        if (orderResult.rows.length === 0) {
+            await client.query("ROLLBACK");
+
+            return res.status(404).json({
+                error: "Order not found."
+            });
+        }
+
+        if (orderResult.rows[0].status !== "Pending") {
+            await client.query("ROLLBACK");
+
+            return res.status(409).json({
+                error: "Completed orders cannot be deleted."
+            });
+        }
+
+        // Restore all quantities deducted when this order was created
+        await restoreOrderStock(client, orderId);
+
+        // Delete its item records first
+        await client.query(
+            `DELETE FROM order_items
+             WHERE order_id = $1`,
+            [orderId]
+        );
+
+        // Delete the order itself
+        await client.query(
+            `DELETE FROM orders
+             WHERE id = $1`,
+            [orderId]
+        );
+
+        await client.query("COMMIT");
+
+        return res.json({
+            message: "Order deleted and stock restored successfully.",
+            order_id: orderId
+        });
+
+    } catch (error) {
+
+        await rollbackQuietly(client);
+
+        console.error("Delete order error:", error);
+
+        return res.status(500).json({
+            error: "Failed to delete order."
+        });
+
+    } finally {
+
+        if (client) {
+            client.release();
+        }
     }
 });
 

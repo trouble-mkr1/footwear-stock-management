@@ -562,79 +562,202 @@ newProductForm.addEventListener("submit", async (event) => {
     }
 }); 
 
-//Order-Page
+
+
+// ORDER MANAGEMENT
+
 let allOrders = [];
+let editingOrderId = null;
 
-fetch("/api/orders")
-    .then(response => {
-        if (!response.ok) {
-            throw new Error("Failed to load orders.");
-        }
-
-        return response.json();
-    })
-    .then(orders => {
-        allOrders = orders;
-        displayOrders(orders);
-    })
-    .catch(error => {
-        console.error("Error Loading Orders:", error);
-        document.getElementById("orders-container").textContent =
-            "Failed to load orders. Please try again.";
-    });
-
+// Main order page elements
 const ordersButton = document.getElementById("orders-button");
 const ordersPage = document.getElementById("orders-page");
 const ordersContainer = document.getElementById("orders-container");
 const orderSearch = document.getElementById("order-search");
 
-
-orderSearch.addEventListener("input", () => {
-    const searchText = orderSearch.value.trim().toLowerCase();
-
-    const filteredOrders = allOrders.filter(order =>
-        (order.company_name || "").toLowerCase().includes(searchText)
-    );
-
-    displayOrders(filteredOrders);
-});
-
-
+// Add / Edit form elements
 const addOrderButton = document.getElementById("add-order-button");
 const addOrderForm = document.getElementById("add-order-form");
 const cancelOrder = document.getElementById("cancel-order");
 const orderForm = document.getElementById("order-form");
+const orderFormTitle = document.getElementById("order-form-title");
+const saveOrderButton = document.getElementById("save-order-button");
+
 const orderItemsContainer = document.getElementById("order-items-container");
 const addOrderItemButton = document.getElementById("add-order-item");
 
+// Order details elements
 const orderDetailsPage = document.getElementById("order-details-page");
 const orderDetailsContainer = document.getElementById("order-details-container");
 const backToOrders = document.getElementById("back-to-orders");
 
-// Orders navigation
+
+// Load orders when the Orders section is opened
 ordersButton.addEventListener("click", () => {
     hideAllMainSections();
+
     ordersPage.classList.remove("hidden");
 
     updateActiveNav(ordersButton);
-    loadOrders();
-});
-
-
-addOrderButton.addEventListener("click", () => {
-    ordersPage.classList.add("hidden");
-    addOrderForm.classList.remove("hidden");
-});
-cancelOrder.addEventListener("click", () => {
-    ordersPage.classList.remove("hidden");
-    addOrderForm.classList.add("hidden");
 
     loadOrders();
 });
 
+
+// Search orders by company name, order ID or address
+orderSearch.addEventListener("input", () => {
+    displayFilteredOrders();
+});
+
+
+function displayFilteredOrders() {
+
+    const searchText = orderSearch.value.trim().toLowerCase();
+
+    const filteredOrders = allOrders.filter(order => {
+
+        const company = String(order.company_name || "").toLowerCase();
+        const address = String(order.address || "").toLowerCase();
+        const orderId = String(order.id || "");
+
+        return (
+            company.includes(searchText) ||
+            address.includes(searchText) ||
+            orderId.includes(searchText)
+        );
+    });
+
+    displayOrders(filteredOrders);
+}
+
+
+// Fetch all orders
+async function loadOrders() {
+
+    try {
+        ordersContainer.textContent = "Loading orders...";
+
+        const response = await fetch("/api/orders");
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || "Failed to load orders.");
+        }
+
+        allOrders = result;
+
+        displayFilteredOrders();
+
+    } catch (error) {
+
+        console.error("Load orders error:", error);
+
+        ordersContainer.textContent =
+            error.message || "Failed to load orders.";
+    }
+}
+
+
+// Create a full-width order card
+function displayOrders(orders) {
+
+    ordersContainer.replaceChildren();
+
+    if (!orders || orders.length === 0) {
+
+        const message = document.createElement("p");
+
+        message.className = "empty-orders-message";
+        message.textContent = "No orders found.";
+
+        ordersContainer.appendChild(message);
+
+        return;
+    }
+
+    orders.forEach(order => {
+
+        const orderCard = document.createElement("div");
+
+        orderCard.className = "order-card";
+        orderCard.dataset.id = order.id;
+        orderCard.tabIndex = 0;
+        orderCard.setAttribute("role", "button");
+        orderCard.setAttribute(
+            "aria-label",
+            `View order ${order.id} for ${order.company_name}`
+        );
+
+        const orderInfo = document.createElement("div");
+        orderInfo.className = "order-info";
+
+        const titleRow = document.createElement("div");
+        titleRow.className = "order-title-row";
+
+        const companyName = document.createElement("h3");
+        companyName.className = "order-company-name";
+        companyName.textContent = order.company_name || "Unnamed Company";
+
+        const orderId = document.createElement("span");
+        orderId.className = "order-id";
+        orderId.textContent = `Order #${order.id}`;
+
+        titleRow.append(companyName, orderId);
+
+        const address = document.createElement("p");
+        address.className = "order-address";
+        address.textContent = `Address: ${order.address || "Not provided"}`;
+
+        const status = document.createElement("span");
+        status.className =
+            `order-status ${String(order.status).toLowerCase() === "pending"
+                ? "pending"
+                : "completed"}`;
+
+        status.textContent = order.status || "Unknown";
+
+        orderInfo.append(titleRow, address, status);
+
+        const actions = document.createElement("div");
+        actions.className = "order-actions";
+
+        if (String(order.status).toLowerCase() === "pending") {
+
+            const editButton = document.createElement("button");
+            editButton.type = "button";
+            editButton.className = "order-action-button edit-order-button";
+            editButton.dataset.id = order.id;
+            editButton.textContent = "EDIT ORDER";
+
+            const deleteButton = document.createElement("button");
+            deleteButton.type = "button";
+            deleteButton.className = "order-action-button delete-order-button";
+            deleteButton.dataset.id = order.id;
+            deleteButton.textContent = "DELETE ORDER";
+
+            const completeButton = document.createElement("button");
+            completeButton.type = "button";
+            completeButton.className = "order-action-button complete-order-button";
+            completeButton.dataset.id = order.id;
+            completeButton.textContent = "COMPLETE ORDER";
+
+            actions.append(editButton, deleteButton, completeButton);
+        }
+
+        orderCard.append(orderInfo, actions);
+
+        ordersContainer.appendChild(orderCard);
+    });
+}
+
+
+// Add another item row
 addOrderItemButton.addEventListener("click", () => {
+
     const newItem = document.createElement("div");
-    newItem.classList.add("order-item");
+
+    newItem.className = "order-item";
 
     newItem.innerHTML = `
         <label>Art No</label>
@@ -674,14 +797,17 @@ addOrderItemButton.addEventListener("click", () => {
         >
 
         <button type="button" class="remove-order-item">
-            Remove Item
+            REMOVE ITEM
         </button>
     `;
 
     orderItemsContainer.appendChild(newItem);
 });
 
+
+// Remove an additional item row
 orderItemsContainer.addEventListener("click", event => {
+
     const removeButton = event.target.closest(".remove-order-item");
 
     if (!removeButton) {
@@ -695,18 +821,244 @@ orderItemsContainer.addEventListener("click", event => {
     }
 });
 
-orderForm.addEventListener("submit", async (event) => {
+
+// Clear form and return it to Add Order mode
+function resetOrderForm() {
+
+    orderForm.reset();
+
+    const itemRows = orderItemsContainer.querySelectorAll(".order-item");
+
+    itemRows.forEach((item, index) => {
+
+        if (index > 0) {
+            item.remove();
+        } else {
+            item.querySelector(".order-art-number").value = "";
+            item.querySelector(".order-colour").value = "";
+            item.querySelector(".order-size").value = "";
+            item.querySelector(".order-quantity").value = "";
+        }
+    });
+
+    if (typeof clearInlineValidation === "function") {
+        clearInlineValidation(orderForm);
+    }
+
+    editingOrderId = null;
+
+    orderFormTitle.textContent = "ADD ORDER";
+    saveOrderButton.textContent = "SAVE ORDER";
+}
+
+
+// Open Add Order form
+addOrderButton.addEventListener("click", () => {
+
+    resetOrderForm();
+
+    hideAllMainSections();
+
+    addOrderForm.classList.remove("hidden");
+
+    updateActiveNav(ordersButton);
+});
+
+
+// Cancel Add / Edit Order
+cancelOrder.addEventListener("click", () => {
+
+    resetOrderForm();
+
+    hideAllMainSections();
+
+    ordersPage.classList.remove("hidden");
+
+    loadOrders();
+});
+
+
+// Open the Edit Order form and fill existing information
+async function editOrder(orderId) {
+
+    try {
+
+        const response = await fetch(
+            `/api/orders/${encodeURIComponent(orderId)}`
+        );
+
+        const order = await response.json();
+
+        if (!response.ok) {
+            throw new Error(order.error || "Failed to load order.");
+        }
+
+        if (String(order.status).toLowerCase() !== "pending") {
+            throw new Error("Only pending orders can be edited.");
+        }
+
+        resetOrderForm();
+
+        document.getElementById("order-company-name").value =
+            order.company_name || "";
+
+        document.getElementById("order-address").value =
+            order.address || "";
+
+        const items = order.items || [];
+
+        if (items.length === 0) {
+            throw new Error("This order has no items to edit.");
+        }
+
+        // Fill the first existing row
+        const firstRow = orderItemsContainer.querySelector(".order-item");
+
+        firstRow.querySelector(".order-art-number").value =
+            items[0].art_number;
+
+        firstRow.querySelector(".order-colour").value =
+            items[0].colour;
+
+        firstRow.querySelector(".order-size").value =
+            items[0].size;
+
+        firstRow.querySelector(".order-quantity").value =
+            items[0].quantity;
+
+        // Add remaining item rows
+        for (let i = 1; i < items.length; i++) {
+
+            const item = items[i];
+
+            const newItem = document.createElement("div");
+
+            newItem.className = "order-item";
+
+            newItem.innerHTML = `
+                <label>Art No</label>
+                <input
+                    type="text"
+                    class="order-art-number"
+                    value="${escapeOrderValue(item.art_number)}"
+                    required
+                >
+
+                <label>Colour</label>
+                <input
+                    type="text"
+                    class="order-colour"
+                    value="${escapeOrderValue(item.colour)}"
+                    required
+                >
+
+                <label>Size</label>
+                <input
+                    type="number"
+                    class="order-size"
+                    min="1"
+                    step="1"
+                    value="${Number(item.size)}"
+                    required
+                >
+
+                <label>Quantity</label>
+                <input
+                    type="number"
+                    class="order-quantity"
+                    min="1"
+                    step="1"
+                    value="${Number(item.quantity)}"
+                    required
+                >
+
+                <button type="button" class="remove-order-item">
+                    REMOVE ITEM
+                </button>
+            `;
+
+            orderItemsContainer.appendChild(newItem);
+        }
+
+        editingOrderId = orderId;
+
+        orderFormTitle.textContent = `EDIT ORDER #${orderId}`;
+        saveOrderButton.textContent = "UPDATE ORDER";
+
+        hideAllMainSections();
+
+        addOrderForm.classList.remove("hidden");
+
+        updateActiveNav(ordersButton);
+
+    } catch (error) {
+
+        console.error("Edit order loading error:", error);
+
+        alert(error.message || "Unable to open this order for editing.");
+    }
+}
+
+
+// Escape text before inserting into an HTML attribute
+function escapeOrderValue(value) {
+
+    return String(value ?? "").replace(/[&<>"']/g, character => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[character]);
+}
+
+
+// Submit Add Order or Edit Order
+orderForm.addEventListener("submit", async event => {
+
     event.preventDefault();
 
-    const companyName = document.getElementById("order-company-name").value.trim();
-    const address = document.getElementById("order-address").value.trim();
-    const orderItems = document.querySelectorAll(".order-item");
+    const companyName =
+        document.getElementById("order-company-name").value.trim();
+
+    const address =
+        document.getElementById("order-address").value.trim();
+
+    const itemRows = orderItemsContainer.querySelectorAll(".order-item");
+
     const items = [];
-    orderItems.forEach(item => {
-        const artNumber = item.querySelector(".order-art-number").value.trim();
-        const colour = item.querySelector(".order-colour").value.trim();
-        const size = Number(item.querySelector(".order-size").value);
-        const quantity = Number(item.querySelector(".order-quantity").value);
+
+    for (const row of itemRows) {
+
+        const artNumber =
+            row.querySelector(".order-art-number").value.trim();
+
+        const colour =
+            row.querySelector(".order-colour").value.trim();
+
+        const sizeValue =
+            row.querySelector(".order-size").value;
+
+        const quantityValue =
+            row.querySelector(".order-quantity").value;
+
+        const size = Number(sizeValue);
+        const quantity = Number(quantityValue);
+
+        if (!artNumber || !colour || !sizeValue || !quantityValue) {
+            alert("Please fill in all order item fields.");
+            return;
+        }
+
+        if (!Number.isInteger(size) || size <= 0) {
+            alert("Please enter a valid whole-number size.");
+            return;
+        }
+
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+            alert("Please enter a valid whole-number quantity.");
+            return;
+        }
 
         items.push({
             art_number: artNumber,
@@ -714,11 +1066,28 @@ orderForm.addEventListener("submit", async (event) => {
             size: size,
             quantity: quantity
         });
-    });
+    }
+
+    if (!companyName || !address || items.length === 0) {
+        alert("Please fill in the company name, address and at least one item.");
+        return;
+    }
+
+    const isEditing = editingOrderId !== null;
+
+    const url = isEditing
+        ? `/api/orders/${encodeURIComponent(editingOrderId)}`
+        : "/api/orders";
+
+    const method = isEditing ? "PUT" : "POST";
+
+    saveOrderButton.disabled = true;
+    saveOrderButton.textContent = isEditing ? "UPDATING..." : "SAVING...";
 
     try {
-        const response = await fetch("/api/orders", {
-            method: "POST",
+
+        const response = await fetch(url, {
+            method,
             headers: {
                 "Content-Type": "application/json"
             },
@@ -731,112 +1100,180 @@ orderForm.addEventListener("submit", async (event) => {
 
         const data = await response.json();
 
-        if(!response.ok) {
-            alert(data.error || "Failed To Add Orders!!!");
-            return;
-        }
-        alert("Order Added Sucessfully..");
-        orderForm.reset();
-
-        // Remove additional item rows after successful order creation
-        orderItemsContainer.querySelectorAll(".order-item").forEach((item, index) => {
-            if (index > 0) {
-                item.remove();
-            }
-        });
-
-        addOrderForm.classList.add("hidden");
-        ordersPage.classList.remove("hidden");
-
-        loadOrders();
-    } catch (error) {
-        console.error("ERROR: FAILED IN ADDING ORDER!!!", error);
-        alert("Something Went Wrong While Adding The Order..");
-    }
-});
-
-
-async function loadOrders() {
-    try {
-        const response = await fetch("/api/orders");
-
         if (!response.ok) {
-            throw new Error("Failed to load orders.");
+            throw new Error(data.error || "Failed to save order.");
         }
 
-        const orders = await response.json();
-
-        allOrders = orders;
-
-        const searchText = orderSearch.value.trim().toLowerCase();
-
-        const filteredOrders = allOrders.filter(order =>
-            (order.company_name || "").toLowerCase().includes(searchText)
+        alert(
+            isEditing
+                ? `Order #${editingOrderId} updated successfully.`
+                : `Order #${data.order_id} created successfully.`
         );
 
-        displayOrders(filteredOrders);
+        resetOrderForm();
+
+        hideAllMainSections();
+
+        ordersPage.classList.remove("hidden");
+
+        await loadOrders();
 
     } catch (error) {
-        console.error("ERROR IN LOADING ORDERS!!!", error);
-        ordersContainer.textContent = "Failed to load orders.";
+
+        console.error("Save order error:", error);
+
+        alert(error.message || "Something went wrong while saving the order.");
+
+    } finally {
+
+        saveOrderButton.disabled = false;
+
+        if (editingOrderId !== null) {
+            saveOrderButton.textContent = "UPDATE ORDER";
+        } else {
+            saveOrderButton.textContent = "SAVE ORDER";
+        }
     }
-}
-
-
-function displayOrders(orders) {
-    ordersContainer.replaceChildren();
-
-    if (!orders || orders.length === 0) {
-        const message = document.createElement("p");
-        message.textContent = "No Pending Orders.";
-        ordersContainer.appendChild(message);
-        return;
-    }
-
-    orders.forEach(order => {
-        const orderCard = document.createElement("div");
-        orderCard.classList.add("order-card");
-
-        const orderInfo = document.createElement("div");
-        orderInfo.className = "order-info";
-
-        const companyName = document.createElement("h3");
-        companyName.className = "order-company-name";
-        companyName.dataset.id = order.id;
-        companyName.textContent = order.company_name || "Unnamed Company";
-
-        const address = document.createElement("p");
-        address.textContent = `Address: ${order.address || "Not provided"}`;
-
-        const status = document.createElement("p");
-        status.textContent = `Status: ${order.status || "Unknown"}`;
-
-        const completeButton = document.createElement("button");
-        completeButton.className = "complete-order-button";
-        completeButton.dataset.id = order.id;
-        completeButton.textContent = "COMPLETE";
-
-        orderInfo.append(companyName, address, status);
-        orderCard.append(orderInfo, completeButton);
-
-        ordersContainer.appendChild(orderCard);
-    });
-}
-
-ordersContainer.addEventListener("click", async (event) => {
-    const companyName = event.target.closest(".order-company-name");
-
-    if (!companyName || !ordersContainer.contains(companyName)) {
-        return;
-    }
-
-    const orderId = companyName.dataset.id;
-    await loadOrderDetails(orderId);
 });
 
-async function loadOrderDetails(orderId) {
+
+// Delete a pending order
+async function deleteOrder(orderId) {
+
+    const confirmed = confirm(
+        `Are you sure you want to delete Order #${orderId}?\n\nThe stock from this pending order will be restored.`
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
     try {
-        const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}`);
+
+        const response = await fetch(
+            `/api/orders/${encodeURIComponent(orderId)}`,
+            {
+                method: "DELETE"
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Failed to delete order.");
+        }
+
+        alert(`Order #${orderId} deleted. Stock has been restored.`);
+
+        await loadOrders();
+
+    } catch (error) {
+
+        console.error("Delete order error:", error);
+
+        alert(error.message || "Unable to delete this order.");
+    }
+}
+
+
+// Complete a pending order
+async function completeOrder(orderId) {
+
+    const confirmed = confirm(
+        `Mark Order #${orderId} as completed?`
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            `/api/orders/${encodeURIComponent(orderId)}/complete`,
+            {
+                method: "PUT"
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Failed to complete order.");
+        }
+
+        alert(`Order #${orderId} completed successfully.`);
+
+        await loadOrders();
+
+    } catch (error) {
+
+        console.error("Complete order error:", error);
+
+        alert(error.message || "Unable to complete this order.");
+    }
+}
+
+
+// Handle clicks on order cards and their action buttons
+ordersContainer.addEventListener("click", async event => {
+
+    const editButton = event.target.closest(".edit-order-button");
+
+    if (editButton) {
+        await editOrder(editButton.dataset.id);
+        return;
+    }
+
+    const deleteButton = event.target.closest(".delete-order-button");
+
+    if (deleteButton) {
+        await deleteOrder(deleteButton.dataset.id);
+        return;
+    }
+
+    const completeButton = event.target.closest(".complete-order-button");
+
+    if (completeButton) {
+        await completeOrder(completeButton.dataset.id);
+        return;
+    }
+
+    const orderCard = event.target.closest(".order-card");
+
+    if (orderCard && ordersContainer.contains(orderCard)) {
+        await loadOrderDetails(orderCard.dataset.id);
+    }
+});
+
+
+// Keyboard support for opening order cards
+ordersContainer.addEventListener("keydown", async event => {
+
+    if (event.key !== "Enter" && event.key !== " ") {
+        return;
+    }
+
+    const orderCard = event.target.closest(".order-card");
+
+    if (!orderCard || event.target !== orderCard) {
+        return;
+    }
+
+    event.preventDefault();
+
+    await loadOrderDetails(orderCard.dataset.id);
+});
+
+
+// Load individual order details
+async function loadOrderDetails(orderId) {
+
+    try {
+
+        const response = await fetch(
+            `/api/orders/${encodeURIComponent(orderId)}`
+        );
 
         const order = await response.json();
 
@@ -847,10 +1284,19 @@ async function loadOrderDetails(orderId) {
         orderDetailsContainer.replaceChildren();
 
         const detailsCard = document.createElement("div");
-        detailsCard.className = "order-deatls-card";
+        detailsCard.className = "order-details-card";
+
+        const heading = document.createElement("div");
+        heading.className = "order-details-heading";
 
         const companyName = document.createElement("h3");
         companyName.textContent = order.company_name || "Unnamed Company";
+
+        const orderIdLabel = document.createElement("p");
+        orderIdLabel.className = "order-details-id";
+        orderIdLabel.textContent = `Order #${order.id}`;
+
+        heading.append(companyName, orderIdLabel);
 
         const address = document.createElement("p");
         address.textContent = `Address: ${order.address || "Not provided"}`;
@@ -859,14 +1305,18 @@ async function loadOrderDetails(orderId) {
         status.textContent = `Status: ${order.status || "Unknown"}`;
 
         const itemsHeading = document.createElement("h4");
-        itemsHeading.textContent = "Order Items:";
+        itemsHeading.textContent = "ORDER ITEMS";
 
         const itemsList = document.createElement("div");
         itemsList.className = "order-items-list";
 
-        (order.items || []).forEach(item => {
+        (order.items || []).forEach((item, index) => {
+
             const itemDetails = document.createElement("div");
             itemDetails.className = "order-items-details";
+
+            const itemNumber = document.createElement("strong");
+            itemNumber.textContent = `Item ${index + 1}`;
 
             const art = document.createElement("p");
             art.textContent = `Art No: ${item.art_number}`;
@@ -880,66 +1330,100 @@ async function loadOrderDetails(orderId) {
             const quantity = document.createElement("p");
             quantity.textContent = `Quantity: ${item.quantity}`;
 
-            itemDetails.append(art, colour, size, quantity);
+            itemDetails.append(
+                itemNumber,
+                art,
+                colour,
+                size,
+                quantity
+            );
+
             itemsList.appendChild(itemDetails);
         });
 
+        const detailsActions = document.createElement("div");
+        detailsActions.className = "order-details-actions";
+
+        if (String(order.status).toLowerCase() === "pending") {
+
+            const editButton = document.createElement("button");
+            editButton.type = "button";
+            editButton.className = "order-action-button edit-order-button";
+            editButton.textContent = "EDIT ORDER";
+
+            editButton.addEventListener("click", () => {
+                editOrder(order.id);
+            });
+
+            const deleteButton = document.createElement("button");
+            deleteButton.type = "button";
+            deleteButton.className = "order-action-button delete-order-button";
+            deleteButton.textContent = "DELETE ORDER";
+
+            deleteButton.addEventListener("click", async () => {
+                await deleteOrder(order.id);
+
+                if (!allOrders.some(item => Number(item.id) === Number(order.id))) {
+                    hideAllMainSections();
+                    ordersPage.classList.remove("hidden");
+                }
+            });
+
+            const completeButton = document.createElement("button");
+            completeButton.type = "button";
+            completeButton.className = "order-action-button complete-order-button";
+            completeButton.textContent = "COMPLETE ORDER";
+
+            completeButton.addEventListener("click", async () => {
+                await completeOrder(order.id);
+
+                if (allOrders.some(item =>
+                    Number(item.id) === Number(order.id) &&
+                    String(item.status).toLowerCase() === "completed"
+                )) {
+                    await loadOrderDetails(order.id);
+                }
+            });
+
+            detailsActions.append(editButton, deleteButton, completeButton);
+        }
+
         detailsCard.append(
-            companyName,
+            heading,
             address,
             status,
             itemsHeading,
-            itemsList
+            itemsList,
+            detailsActions
         );
 
         orderDetailsContainer.appendChild(detailsCard);
 
-        ordersPage.classList.add("hidden");
-        addOrderForm.classList.add("hidden");
+        hideAllMainSections();
+
         orderDetailsPage.classList.remove("hidden");
 
+        updateActiveNav(ordersButton);
+
     } catch (error) {
-        console.error("ERROR: IN LOADING DETAILS!!!", error);
-        alert(error.message || "Something went wrong while loading details.");
+
+        console.error("Load order details error:", error);
+
+        alert(error.message || "Unable to load order details.");
     }
 }
 
 
-ordersContainer.addEventListener("click", async (event) => {
-    const completeButton = event.target.closest(".complete-order-button");
-
-    if (!completeButton || !ordersContainer.contains(completeButton)) {
-        return;
-    }
-
-    const orderId = completeButton.dataset.id;
-
-    try {
-        const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/complete`, {
-            method: "PUT"
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || "Failed to complete order.");
-        }
-
-        alert("Order Completed Successfully!");
-
-        await loadOrders();
-
-    } catch (error) {
-        console.error("ERROR: IN COMPLETING ORDER!!!", error);
-        alert(error.message || "Something went wrong while completing the order.");
-    }
-});
-
+// Back to Orders list
 backToOrders.addEventListener("click", () => {
-    orderDetailsPage.classList.add("hidden");
+
+    hideAllMainSections();
+
     ordersPage.classList.remove("hidden");
+
     loadOrders();
 });
+
 // Hide all main content sections
 function hideAllMainSections() {
     dashboardPage.classList.add("hidden");
@@ -1110,3 +1594,16 @@ newVariantForm.addEventListener("submit", async (event) => {
         alert(error.message);
     }
 });
+
+
+// Open the requested admin section when navigating from another page
+const requestedAdminPage =
+    new URLSearchParams(window.location.search).get("page");
+
+if (requestedAdminPage === "dashboard") {
+    dashboardButton.click();
+} else if (requestedAdminPage === "products") {
+    productButton.click();
+} else if (requestedAdminPage === "orders") {
+    ordersButton.click();
+}

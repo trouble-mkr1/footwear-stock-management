@@ -11,7 +11,7 @@
 <body>
 
     <header class="topbar">
-        <h1>HAWA TRAADERS FOOTWEAR STOCK MANAGEMENT</h1>
+        <h1>HAWA TRADERS FOOTWEAR STOCK MANAGEMENT</h1>
 
         <button
             type = "button"
@@ -330,19 +330,21 @@
             </div>
             
 
-            <!--ADD-ORDER SECTION-->
-            <div id="add-order-form" class="hidden">
-                <div class="page-header">
-                    <h2>ADD ORDERS</h2>
+            <!--ADD/EDIT ORDER SECTION-->
+            <div id = "add-order-form" class = "hidden">
+
+                <div class = "page-header">
+                    <h2 id = "order-form-title">ADD ORDERS</h2>
                 </div>
-                <form id="order-form">
-                    <label for="order-company-name">
+
+                <form id = "order-form">
+                    <label for = "order-company-name">
                         Company Name
                     </label>
                     <input  
-                        type="text"
-                        id="order-company-name"
-                        placeholder="Enter Company Name"
+                        type = "text"
+                        id = "order-company-name"
+                        placeholder = "Enter Company Name"
                         required
                     >
                  <div id="order-items-container">
@@ -399,8 +401,8 @@
                         placeholder="Enter Address"
                         required
                     ></textarea>
-                    <button type="submit">SAVE ORDER</button>
-                    <button type="button" id="cancel-order">CANCEL</button>
+                    <button type = "submit" id = "save-order-button">SAVE ORDER</button>
+                    <button type = "button" id = "cancel-order">CANCEL</button>
                 </form>
             </div>
 
