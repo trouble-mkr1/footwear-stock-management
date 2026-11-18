@@ -309,6 +309,25 @@ document.getElementById("back-button").addEventListener("click",()=>{
     productsContainer.classList.remove("hidden");
 });
 
+const backToProductsButton = document.getElementById("back-to-products");
+const backToOrdersFormsButton = document.getElementById("back-to-order-form");
+
+backToProductsButton.addEventListener("click", () => {
+    hideAllMainSections();
+    pageHead.classList.remove("hidden");
+    productsContainer.classList.remove("hidden");
+    
+    updateActiveNav(productButton);
+});
+
+backToOrdersFormsButton.addEventListener("click", () => {
+    hideAllMainSections();
+    ordersPage.classList.remove("hidden");
+
+    updateActiveNav(ordersButton);
+    loadOrders();
+});
+
 //search bar functionality
 const searchInput=document.getElementById("product-search");
 searchInput.addEventListener("input",()=>{

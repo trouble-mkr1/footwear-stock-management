@@ -83,13 +83,14 @@
 </section>
 
             <div id="page-head" class="page-header hidden">
-                <h2>Product/Stock Management</h2>
-                <button id="add-stock-button">
-                    +ADD STOCK
-                </button>
+                <h2>PRODUCT</h2>
                 <div class="search-container">
                 <input type="text" id="product-search" placeholder="Search by Art Number.....">
             </div>
+            
+            <button id="add-stock-button">
+                    +ADD STOCK
+                </button>
             </div>
             
             <!-- PRODUCT CATALOGUE -->
@@ -102,7 +103,7 @@
             <div id="product-details" class="product-details hidden">
 
                 <button id="back-button">
-                    Back to Products
+                    Back
                 </button>
 
                 <h2 id="details-art-number"></h2>
@@ -129,7 +130,11 @@
             <!--Adding Stock-->
             <div id="add-stock-form" class="hidden">
                 <h2>Add Stock</h2>
+
                 <form id="stock-form" novalidate>
+                <button type ="button" id ="back-to-products">Back</button>
+                <form id="stock-form">
+
                     <label for="stock-art-number">Art Number</label>
                     <input 
                     type="text"
@@ -358,8 +363,14 @@
                     <h2 id = "order-form-title">ADD ORDERS</h2>
                 </div>
 
+
                 <form id = "order-form">
                     <label for = "order-company-name">
+
+                <button type="button" id="back-to-order-form">Back</button>
+                <form id="order-form">
+                    <lable for="order-company-name">
+
                         Company Name
                     </label>
                     <input  
