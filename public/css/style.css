@@ -1,3 +1,5 @@
+
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -6,62 +8,54 @@
 
 body {
     font-family: Arial, sans-serif;
-    background-color: #080B12;
-    color: #f1f5f9;
+    background-color: #F4F6FA;
+    color: #1E293B;
 }
 
-
-
-/* for the top bar */
+/*TOP BAR */
 
 .topbar {
-    min-height: 70px;
+    min-height: 55px;
     padding: 12px 24px;
-    background-color: #101827;
+    background-color: #075cd3;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-bottom: 1px solid #263449;
+    border-bottom: 1px solid #263A52;
 }
 
 .topbar h1 {
     font-size: 24px;
     font-weight: 600;
     text-align: center;
-    color: #39FF14;
+    color: #FFFFFF;
 }
 
-
-
-
-/* main layout */
+/* MAIN layout*/
 
 .app-container {
     display: flex;
     width: 100%;
     height: calc(100vh - 70px);
     margin: 0;
-    background-color: #080B12;
+    background-color: #F4F6FA;
     border: none;
     overflow: hidden;
 }
 
-
-
-
-/* sidebar */
+/*SIDEBAR */
 
 .sidebar {
-    width: 230px;
+    width: 200px;
     flex-shrink: 0;
-    background-color: #101827;
-    border-right: 1px solid #263449;
+    background-color: #0d56bd;
+    border-right: 1px solid #263A52;
     position: fixed;
-    top: 70px;
+    top: 55px;
     bottom: 0;
     left: 0;
     overflow-y: auto;
-    z-index:10;
+    z-index: 10;
 }
 
 .nav-button {
@@ -69,7 +63,7 @@ body {
     min-height: 60px;
     padding: 12px 20px;
     border: none;
-    border-bottom: 1px solid #263449;
+    border-bottom: 1px solid #075cd3;
     border-radius: 0;
     background-color: transparent;
     color: #CBD5E1;
@@ -78,44 +72,38 @@ body {
     cursor: pointer;
     transition: 0.2s ease;
 }
+
 .nav-button:hover {
-    background-color: #1B2433;
-    color: #39FF14;
+    background-color: #1056ab;
+    color: #FFFFFF;
 }
 
 .nav-button.active {
-    background-color: #1B2433;
-    color: #39FF14;
+    background-color: #1056ab;
+    color: #FFFFFF;
     font-weight: bold;
-    border-left: 4px solid #39FF14;
+    border-left: 4px solid #e8eaed;
 }
 
-
-
-
-/* main content */
+/* MAIN CONTENT */
 
 .main-content {
     flex: 1;
     min-width: 0;
     height: 100%;
-    margin-left: 230px;
+    margin-left: 200px;
     padding: 30px;
     overflow-y: auto;
-    background-color: #080B12;
+    background-color: #F4F6FA;
 }
 
 .main-content h2 {
     font-size: 28px;
-    margin-bottom: 24px;
-    color: #F1F5F9;
+    margin-bottom: 0px;
+    color: #14243A;
 }
 
-
-
-
-
-/* Dashboard styling */
+/* DASHBOARD */
 
 #dashboard-page {
     width: 100%;
@@ -131,9 +119,10 @@ body {
     min-width: 0;
     min-height: 160px;
     padding: 24px;
-    background-color: #1B2433;
-    border: 1px solid #334155;
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
     border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -143,38 +132,27 @@ body {
 }
 
 .dashboard-card:hover {
-    border-color: #39FF14;
+    border-color: #075cd3;
+    box-shadow: 0 6px 16px rgba(5, 58, 144, 0.12);
     transform: translateY(-3px);
 }
 
 .dashboard-card h3 {
     font-size: 15px;
     font-weight: 500;
-    color: #94A3B8;
+    color: #64748B;
     margin: 0;
 }
 
 .dashboard-card p {
     font-size: 36px;
     font-weight: bold;
-    color: #39FF14;
+    color: #075cd3;
     margin: 0;
 }
 
-/* Dashboard responsive layout */
-@media (max-width: 1100px) {
-    .dashboard-cards {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
+/*page header*/
 
-@media (max-width: 500px) {
-    .dashboard-cards {
-        grid-template-columns: 1fr;
-    }
-}
-
-/*Page header*/
 .page-header {
     display: flex;
     align-items: center;
@@ -186,20 +164,26 @@ body {
 
 .page-header h2 {
     margin: 0;
+    color: #075cd3;
 }
+
+/* buttons */
 
 #add-stock-button,
 #add-new-product-button,
 #add-new-product-form button,
 #stock-form button,
+#add-order-button,
 #new-product-form button {
     padding: 12px 18px;
-    border: 2px solid #000;
+    border: 1px solid #053a90;
     border-radius: 8px;
-    background-color: #ffd5fd;
+    background-color: #053a90;
+    color: #FFFFFF;
     font-size: 15px;
-    font-weight: bold;
+    font-weight: 600;
     cursor: pointer;
+    transition: 0.2s ease;
 }
 
 #add-stock-button:hover,
@@ -207,27 +191,48 @@ body {
 #add-new-product-form button:hover,
 #stock-form button:hover,
 #new-product-form button:hover {
-    background-color: #f5bdf2;
+    background-color: #053a90;
+    border-color: #053a90;
 }
 
 
+/*SEARCH BAR*/
 
-/*Search bar*/
+
 .search-container {
-   margin-bottom: 25px;
+    margin-bottom: 55px;
+    
 }
-
 
 #product-search {
     width: 100%;
-    padding: 12px 14px;
-    border: 2px solid black;
+    padding: 16px 18px;
+    border: 1px solid #CBD5E1;
     border-radius: 8px;
+    background-color: #FFFFFF;
+    color: #1E293B;
     font-size: 16px;
+    outline: none;
+}
+#order-search {
+    width: 75%;
+    padding: 12px 14px;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    background-color: #FFFFFF;
+    color: #1E293B;
+    font-size: 16px;
+    outline: none;
 }
 
+#product-search:focus,
+#order-search:focus {
+    border-color: #053a90;
+    box-shadow: 0 0 0 3px rgba(5, 58, 144, 0.12);
+}
 
 /*product grid*/
+
 .products-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -235,17 +240,20 @@ body {
     align-items: start;
 }
 
+/* product cards */
 
-/*product card*/
 .product-card {
-    background-color: #1B2433;
-    border: 1px solid #334155;
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
     border-radius: 14px;
     overflow: hidden;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    transition: 0.2s ease;
 }
 
 .product-card:hover {
-    border-color: #39FF14;
+    border-color: #93C5FD;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
     transform: translateY(-4px);
 }
 
@@ -259,27 +267,24 @@ body {
 
 .product-info {
     padding: 20px;
-    color: #F1F5F9;
+    color: #1E293B;
 }
 
 .product-info h3 {
     font-size: 20px;
     margin-bottom: 14px;
-    color: #39FF14;
+    color: #14243A;
 }
 
 .product-info p {
     font-size: 16px;
     line-height: 1.7;
-    color: #CBD5E1;
+    color: #64748B;
     margin-bottom: 8px;
 }
 
-/* Product catalogue heading */
-.page-header h2 {
-    color: #F1F5F9;
-}
 /*product details*/
+
 .product-details {
     max-width: 800px;
     width: 100%;
@@ -293,6 +298,14 @@ body {
     padding: 10px 16px;
     margin-bottom: 20px;
     cursor: pointer;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    background-color: #FFFFFF;
+    color: #1E293B;
+}
+
+#back-button:hover {
+    background-color: #E2E8F0;
 }
 
 .details-image {
@@ -302,8 +315,9 @@ body {
     max-height: 350px;
     object-fit: contain;
     margin: 20px 0;
-    border: 2px solid black;
+    border: 1px solid #E2E8F0;
     border-radius: 10px;
+    background-color: #FFFFFF;
 }
 
 #colour-buttons {
@@ -316,32 +330,41 @@ body {
 .colour-button {
     padding: 10px 24px;
     cursor: pointer;
-    border: 2px solid black;
+    border: 1px solid #CBD5E1;
     border-radius: 6px;
-    background-color: white;
+    background-color: #FFFFFF;
+    color: #1E293B;
 }
 
 .colour-button.active-colour {
-    background-color: #ffd5fd;
+    background-color: #DBEAFE;
+    border-color: #053a90;
+    color: #053a90;
 }
 
+/*stock table*/
 
-/* stck table*/
 .stock-table {
     border-collapse: collapse;
     width: 100%;
     max-width: 500px;
+    background-color: #FFFFFF;
 }
 
-.stock-table th, 
+.stock-table th,
 .stock-table td {
-    border: 1px solid black;
+    border: 1px solid #E2E8F0;
     padding: 12px;
     text-align: left;
 }
 
+.stock-table th {
+    background-color: #F1F5F9;
+    color: #334155;
+}
 
-/* Forms */
+/* forms*/
+
 #add-stock-form,
 #add-new-product-form,
 #add-order-form {
@@ -355,6 +378,11 @@ body {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    padding: 24px;
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 #stock-form input,
@@ -367,17 +395,31 @@ body {
     width: 100%;
     min-width: 0;
     padding: 11px;
-    border: 1px solid #777;
+    border: 1px solid #CBD5E1;
     border-radius: 6px;
+    background-color: #FFFFFF;
+    color: #1E293B;
     font: inherit;
+    outline: none;
+}
+
+#stock-form input:focus,
+#stock-form select:focus,
+#new-product-form input:focus,
+#new-product-form select:focus,
+#order-form input:focus,
+#order-form select:focus,
+#order-form textarea:focus {
+    border-color: #053a90;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
 #stock-form label,
 #new-product-form label,
 #order-form label {
     font-weight: 600;
+    color: #334155;
 }
-
 
 .image-preview {
     width: 150px;
@@ -385,14 +427,17 @@ body {
     object-fit: contain;
     display: block;
     margin-top: 10px;
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
 }
 
 .image-preview.hidden {
     display: none;
 }
 
+/*orders */
 
-/* orders */
 #orders-container {
     width: 100%;
     min-width: 0;
@@ -400,23 +445,22 @@ body {
 }
 
 #orders-search {
-    width: 100%;
     max-width: 100%;
-    padding: 12px 14px;
     margin-bottom: 20px;
-    border: 2px solid #000;
-    border-radius: 8px;
-    font-size: 16px;
 }
 
+/* responsive layout */
 
-/* smaller screens */
 @media (max-width: 1100px) {
     .main-content {
         padding: 22px;
     }
 
     .products-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .dashboard-cards {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
@@ -434,6 +478,10 @@ body {
         width: 100%;
         display: flex;
         flex-wrap: wrap;
+        position: relative;
+        top: auto;
+        bottom: auto;
+        left: auto;
     }
 
     .nav-button {
@@ -444,7 +492,10 @@ body {
     }
 
     .main-content {
+        height: auto;
+        margin-left: 0;
         padding: 18px;
+        overflow: visible;
     }
 
     .main-content h2 {
@@ -464,6 +515,6 @@ body {
     }
 
     .dashboard-cards {
-        flex-direction: column;
+        grid-template-columns: 1fr;
     }
 }
