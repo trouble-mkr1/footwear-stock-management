@@ -1,0 +1,76 @@
+/* HAWA TRADERS: shared feedback styles (all selectors prefixed to avoid collisions) */
+.hawa-toast {
+    position: fixed;
+    right: 20px;
+    bottom: 22px;
+    z-index: 10000;
+    max-width: min(420px, calc(100vw - 32px));
+    padding: 13px 18px;
+    border-radius: 10px;
+    background: #172235;
+    color: #f8fafc;
+    border: 1px solid #334155;
+    border-left: 4px solid #39ff14;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, .35);
+    font-size: 14px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+.hawa-toast[hidden] { display: none !important; }
+.hawa-toast--warning { border-left-color: #fbbf24; }
+.hawa-toast--error { border-left-color: #f87171; }
+
+.hawa-dialog {
+    box-sizing: border-box;
+    width: min(92vw, 420px);
+    max-height: min(85vh, 640px);
+    margin: auto;
+    padding: 0;
+    border-radius: 14px;
+    border: 1px solid #334155;
+    background: #101827;
+    color: #f8fafc;
+    box-shadow: 0 22px 65px rgba(0,0,0,.48);
+}
+.hawa-dialog::backdrop { background: rgba(3, 7, 18, .72); }
+.hawa-dialog__panel { padding: 24px; }
+.hawa-dialog__title {
+    margin: 0 0 12px;
+    font-size: 19px;
+    font-weight: 700;
+    color: #f8fafc;
+}
+.hawa-dialog__message {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.55;
+    color: #cbd5e1;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+.hawa-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+}
+.hawa-dialog__button {
+    min-width: 88px;
+    padding: 10px 15px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+}
+.hawa-dialog__button--cancel { background: #243247; color: #f8fafc; border-color: #475569; }
+.hawa-dialog__button--primary { background: #39ff14; color: #101827; }
+.hawa-dialog__button--danger { background: #dc2626; color: #fff; }
+.hawa-dialog__button:focus-visible { outline: 2px solid #39ff14; outline-offset: 3px; }
+
+@media (max-width: 480px) {
+    .hawa-toast { right: 16px; left: 16px; bottom: 16px; max-width: none; }
+    .hawa-dialog__panel { padding: 20px; }
+}

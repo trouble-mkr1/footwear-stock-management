@@ -62,7 +62,7 @@
             } catch (error) {
                 console.error("Logout error:", error);
 
-                alert(error.message || "Unable to log out.");
+                HawaUI.alert(error.message || "Unable to log out.", { title: "Logout failed" });
 
                 logoutButton.disabled = false;
                 logoutButton.textContent = "LOG OUT";

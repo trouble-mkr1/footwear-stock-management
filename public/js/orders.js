@@ -214,8 +214,10 @@ async function refreshOrderAndStock() {
     ]);
     loadDashboard();
     if (!ordersOk || !productsOk) {
-        alert("The change was saved, but some screens could not refresh. Try opening the page again.");
+        HawaUI.toast("Saved, but some pages could not refresh. Open the page again to update them.", "warning");
+        return false;
     }
+    return true;
 }
 
 async function loadOrderDetails(orderId) {
@@ -269,7 +271,7 @@ async function loadOrderDetails(orderId) {
         updateActiveNav(ordersButton);
     } catch (error) {
         console.error("Order details failed:", error);
-        alert(error.message);
+        HawaUI.alert(error.message, { title: "Unable to load order details" });
     }
 }
 
@@ -299,36 +301,44 @@ async function editOrder(orderId) {
         updateActiveNav(ordersButton);
     } catch (error) {
         console.error("Edit order failed:", error);
-        alert(error.message);
+        HawaUI.alert(error.message, { title: "Unable to edit order" });
     }
 }
 
 async function deleteOrder(orderId) {
-    if (!confirm(`Delete Order #${orderId}? Its reserved stock will be restored.`)) return;
+    const confirmed = await HawaUI.confirm(
+        `Delete Order #${orderId}? Its reserved stock will be restored. This cannot be undone.`,
+        { title: "Delete order", confirmText: "Delete Order", destructive: true }
+    );
+    if (!confirmed) return;
     try {
         const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, { method: "DELETE" });
         await readOrderResponse(response);
         openOrdersPage();
-        await refreshOrderAndStock();
-        alert(`Order #${orderId} deleted. Stock restored.`);
+        const refreshed = await refreshOrderAndStock();
+        if (refreshed) HawaUI.toast(`Order #${orderId} deleted. Stock restored.`);
     } catch (error) {
         console.error("Delete order failed:", error);
-        alert(error.message);
+        HawaUI.alert(error.message, { title: "Unable to delete order" });
     }
 }
 
 async function completeOrder(orderId) {
-    if (!confirm(`Mark Order #${orderId} as completed?`)) return;
+    const confirmed = await HawaUI.confirm(
+        `Mark Order #${orderId} as completed? Completed orders cannot be edited or deleted.`,
+        { title: "Complete order", confirmText: "Complete Order" }
+    );
+    if (!confirmed) return;
     try {
         const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/complete`, { method: "PUT" });
         await readOrderResponse(response);
         const showingDetails = !orderDetailsPage.classList.contains("hidden");
-        await refreshOrderAndStock();
+        const refreshed = await refreshOrderAndStock();
         if (showingDetails) await loadOrderDetails(orderId);
-        alert(`Order #${orderId} completed.`);
+        if (refreshed) HawaUI.toast(`Order #${orderId} completed.`);
     } catch (error) {
         console.error("Complete order failed:", error);
-        alert(error.message);
+        HawaUI.alert(error.message, { title: "Unable to complete order" });
     }
 }
 
@@ -378,7 +388,7 @@ orderForm.addEventListener("submit", async event => {
         !item.art_number || !item.colour || !Number.isInteger(item.size) || item.size <= 0 ||
         !Number.isInteger(item.quantity) || item.quantity <= 0
     )) {
-        alert("Fill in company, address, and valid art number, colour, size and quantity for every item.");
+        HawaUI.toast("Fill in company, address, and valid art number, colour, size and quantity for every item.", "warning");
         return;
     }
 
@@ -396,11 +406,11 @@ orderForm.addEventListener("submit", async event => {
         await readOrderResponse(response);
         resetOrderForm();
         openOrdersPage();
-        await refreshOrderAndStock();
-        alert(editing ? `Order #${orderId} updated.` : "Order created successfully.");
+        const refreshed = await refreshOrderAndStock();
+        if (refreshed) HawaUI.toast(editing ? `Order #${orderId} updated.` : "Order created successfully.");
     } catch (error) {
         console.error("Save order failed:", error);
-        alert(error.message);
+        HawaUI.alert(error.message, { title: "Unable to save order" });
     } finally {
         saveOrderButton.disabled = false;
         saveOrderButton.textContent = editingOrderId !== null ? "UPDATE ORDER" : "SAVE ORDER";

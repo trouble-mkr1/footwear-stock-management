@@ -432,8 +432,8 @@ async function handleAddStock(event){
         {
             throw new Error(result.error||"Failed To Add Stock");
         }
-        alert("Stock Added Successfully!");
-        await refreshProducts();
+        const refreshed = await refreshProducts();
+        HawaUI.toast(refreshed ? "Stock added successfully." : "Stock saved, but the product display could not refresh.", refreshed ? "success" : "warning");
         loadDashboard();
         stockForm.reset();
         clearInlineValidation(stockForm);
@@ -443,7 +443,7 @@ async function handleAddStock(event){
     }catch(error){
         console.error("Error:ADDING STOCK",error)
 
-        alert(error.message);
+        HawaUI.alert(error.message, { title: "Unable to add stock" });
     }
 }
 
@@ -564,7 +564,7 @@ newProductForm.addEventListener("submit", async (event) => {
             throw new Error(result.error || "Failed To Add Prodct!!");
         }
 
-        alert("Product Added Sucessfully...");
+        HawaUI.toast("Product added successfully.");
 
         newProductForm.reset();
         clearInlineValidation(newProductForm);
@@ -579,7 +579,7 @@ newProductForm.addEventListener("submit", async (event) => {
         returnToProductsPage();
     }catch(error) {
         console.error("Error!! Adding Products:",error);
-        alert(error.message);
+        HawaUI.alert(error.message, { title: "Unable to add product" });
     }
 }); 
 
@@ -737,7 +737,7 @@ newVariantForm.addEventListener("submit", async (event) => {
             throw new Error(result.error || "Failed to add colour.");
         }
 
-        alert("New colour added successfully!");
+        HawaUI.toast("New colour added successfully.");
 
         newVariantForm.reset();
         clearInlineValidation(newVariantForm);
@@ -753,7 +753,7 @@ newVariantForm.addEventListener("submit", async (event) => {
 
     } catch (error) {
         console.error("Add colour error:", error);
-        alert(error.message);
+        HawaUI.alert(error.message, { title: "Unable to add colour" });
     }
 });
 
