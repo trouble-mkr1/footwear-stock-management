@@ -1,5 +1,5 @@
-// Shared HAWA TRADERS feedback: small toast messages and accessible dialogs.
-// Include this file BEFORE auth.js, script.js, and orders.js.
+// Shared HAWA TRADERS feedback: this is basically the pop up windows here
+
 (() => {
     "use strict";
 
