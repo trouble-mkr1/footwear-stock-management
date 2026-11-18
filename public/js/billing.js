@@ -84,9 +84,27 @@ function formatCurrency(amount) {
 }
 
 function renderInvoice(order) {
+    // An invoice must never silently turn a missing price into ₹0.
+    if (!Array.isArray(order.items) || order.items.length === 0) {
+        throw new Error("This order has no items. Invoice cannot be prepared.");
+    }
+
+    for (const item of order.items) {
+        if (item.unit_price === null || item.unit_price === undefined ||
+            item.unit_price === "" || !Number.isFinite(Number(item.unit_price)) ||
+            Number(item.unit_price) <= 0) {
+            throw new Error(
+                `Order #${order.id} has a missing/invalid unit price for art ${item.art_number}. Please correct the historical record before printing.`
+            );
+        }
+        if (!Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
+            throw new Error(`Order #${order.id} contains an invalid item quantity.`);
+        }
+    }
+
     const rows = order.items.map(item => {
         const mrp = item.mrp;
-        const price = Number(item.unit_price ?? 0);
+        const price = Number(item.unit_price);
         const quantity = Number(item.quantity);
         const lineTotal = price * quantity;
 
@@ -106,7 +124,7 @@ function renderInvoice(order) {
     }).join("");
 
     const total = order.items.reduce((sum, item) => {
-        const price = Number(item.unit_price ?? 0);
+        const price = Number(item.unit_price);
         return sum + price * Number(item.quantity);
     }, 0);
 

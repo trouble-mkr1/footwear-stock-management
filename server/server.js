@@ -193,6 +193,7 @@ function validateOrderItems(items) {
     }
 
     return items.map(item => {
+        item = item && typeof item === "object" ? item : {};
         const artNumber = String(item.art_number || "").trim();
         const colour = String(item.colour || "").trim();
         const size = Number(item.size);
@@ -239,35 +240,58 @@ function validateOrderItems(items) {
 }
 
 
-// Restore stock from an existing order
+// Restore the exact quantities for each existing order item.
+// Never skip a missing variant or restore to multiple matching variants.
+// The caller must already have started a database transaction.
 async function restoreOrderStock(client, orderId) {
-
     const itemsResult = await client.query(
-        `SELECT
-            pv.id AS variant_id,
-            oi.size,
-            oi.quantity
-         FROM order_items oi
-         JOIN product_variant pv
-            ON pv.art_number = oi.art_number
-            AND LOWER(TRIM(pv.colour)) = LOWER(TRIM(oi.colour))
-         WHERE oi.order_id = $1`,
+        `SELECT id, art_number, colour, size, quantity
+         FROM order_items
+         WHERE order_id = $1
+         ORDER BY id`,
         [orderId]
     );
 
+    if (itemsResult.rows.length === 0) {
+        const error = new Error(`Order #${orderId} has no items; cannot restore stock safely.`);
+        error.statusCode = 409;
+        throw error;
+    }
+
     for (const item of itemsResult.rows) {
+        const variantResult = await client.query(
+            `SELECT id FROM product_variant
+             WHERE art_number = $1
+             AND LOWER(BTRIM(colour)) = LOWER(BTRIM($2::text))`,
+            [item.art_number, item.colour]
+        );
+
+        if (variantResult.rows.length !== 1) {
+            const error = new Error(
+                `Cannot restore stock for order #${orderId}, item #${item.id}: ` +
+                `expected one matching colour variant, found ${variantResult.rows.length}.`
+            );
+            error.statusCode = 409;
+            throw error;
+        }
+
+        const quantity = Number(item.quantity);
+        const size = Number(item.size);
+        if (!Number.isInteger(quantity) || quantity <= 0 ||
+            !Number.isInteger(size) || size <= 0) {
+            const error = new Error(
+                `Order #${orderId}, item #${item.id} has invalid size or quantity.`
+            );
+            error.statusCode = 409;
+            throw error;
+        }
 
         await client.query(
             `INSERT INTO stock (variant_id, size, quantity)
              VALUES ($1, $2, $3)
              ON CONFLICT (variant_id, size)
-             DO UPDATE SET
-                quantity = stock.quantity + EXCLUDED.quantity`,
-            [
-                item.variant_id,
-                item.size,
-                item.quantity
-            ]
+             DO UPDATE SET quantity = stock.quantity + EXCLUDED.quantity`,
+            [variantResult.rows[0].id, size, quantity]
         );
     }
 }
@@ -501,7 +525,7 @@ app.get("/api/products", async (req, res) => {
             ORDER BY p.art_number, pv.colour, s.size
         `);
 
-        const products = {};
+        const products = Object.create(null);
 
         for (const row of result.rows) {
             if (!products[row.art_number]) {
@@ -509,7 +533,7 @@ app.get("/api/products", async (req, res) => {
                     art_number: row.art_number,
                     price: row.price,
                     mrp: row.mrp,
-                    variants: {}
+                    variants: Object.create(null)
                 };
             }
 
@@ -644,12 +668,17 @@ app.post("/api/stock",async(req, res) => {
             `SELECT id
             FROM product_variant
             WHERE art_number = $1
-            AND LOWER(TRIM(colour)) = lower($2)`,[artNumber, colour]
+            AND LOWER(BTRIM(colour)) = LOWER(BTRIM($2::text))`,[artNumber, colour]
         );
 
-        if(variantResult.rows.length === 0) {
+        if (variantResult.rows.length === 0) {
             return res.status(404).json({
-                error:"Colour Variant Not Found. Please Add New Product Variant"
+                error: "Colour variant not found. Please add the colour first."
+            });
+        }
+        if (variantResult.rows.length > 1) {
+            return res.status(409).json({
+                error: "Multiple variants match this colour. Correct the duplicate variants before adding stock."
             });
         }
 
@@ -892,7 +921,7 @@ app.post("/api/products/:artNumber/variants", uploadProductImage, async (req, re
             `SELECT id
              FROM product_variant
              WHERE art_number = $1
-             AND LOWER(TRIM(colour)) = LOWER($2)`,
+             AND LOWER(BTRIM(colour)) = LOWER(BTRIM($2::text))`,
             [artNumber, colour]
         );
 
@@ -1102,21 +1131,25 @@ app.put("/api/orders/:id", async (req, res) => {
                  JOIN products p
                     ON p.art_number = pv.art_number
                  WHERE pv.art_number = $1
-                 AND LOWER(TRIM(pv.colour)) = LOWER($2)`,
+                 AND LOWER(BTRIM(pv.colour)) = LOWER(BTRIM($2::text))`,
                 [item.artNumber, item.colour]
             );
 
-            if (variantResult.rows.length === 0) {
+            if (variantResult.rows.length !== 1) {
                 const error = new Error(
-                    `Product variant not found: ${item.artNumber} - ${item.colour}`
+                    variantResult.rows.length === 0
+                        ? `Product variant not found: ${item.artNumber} - ${item.colour}`
+                        : `Multiple variants match ${item.artNumber} - ${item.colour}. Correct duplicates before changing stock.`
                 );
-                error.statusCode = 404;
+                error.statusCode = variantResult.rows.length === 0 ? 404 : 409;
                 throw error;
             }
 
             const variant = variantResult.rows[0];
 
-            if (variant.price === null || variant.price === undefined) {
+            if (variant.price === null || variant.price === undefined ||
+                !Number.isFinite(Number(variant.price)) ||
+                Number(variant.price) <= 0) {
                 const error = new Error(
                     `Unit price is missing for product ${item.artNumber}.`
                 );
@@ -1155,6 +1188,19 @@ app.put("/api/orders/:id", async (req, res) => {
             ]);
 
             const previousPrice = previousPrices.get(priceKey);
+
+            // Do not silently replace a missing historical price with today's price.
+            if (previousPrice &&
+                (previousPrice.unit_price === null ||
+                 previousPrice.unit_price === undefined ||
+                 !Number.isFinite(Number(previousPrice.unit_price)) ||
+                 Number(previousPrice.unit_price) <= 0)) {
+                const error = new Error(
+                    `Order #${orderId} has a missing/invalid historical unit price for ${item.artNumber}. Correct the record before editing.`
+                );
+                error.statusCode = 409;
+                throw error;
+            }
 
             // Preserve old prices for existing items.
             // Use current product prices only for newly added items.
@@ -1285,8 +1331,8 @@ app.delete("/api/orders/:id", async (req, res) => {
 
         console.error("Delete order error:", error);
 
-        return res.status(500).json({
-            error: "Failed to delete order."
+        return res.status(error.statusCode || 500).json({
+            error: error.statusCode ? error.message : "Failed to delete order."
         });
 
     } finally {
@@ -1412,21 +1458,25 @@ app.post("/api/orders", async (req, res) => {
                  FROM product_variant pv
                  JOIN products p ON p.art_number = pv.art_number
                  WHERE pv.art_number = $1
-                 AND LOWER(TRIM(pv.colour)) = LOWER($2)`,
+                 AND LOWER(BTRIM(pv.colour)) = LOWER(BTRIM($2::text))`,
                 [item.artNumber, item.colour]
             );
 
-            if (variantResult.rows.length === 0) {
+            if (variantResult.rows.length !== 1) {
                 const error = new Error(
-                    `Product variant not found: ${item.artNumber} - ${item.colour}`
+                    variantResult.rows.length === 0
+                        ? `Product variant not found: ${item.artNumber} - ${item.colour}`
+                        : `Multiple variants match ${item.artNumber} - ${item.colour}. Correct duplicates before changing stock.`
                 );
-                error.statusCode = 404;
+                error.statusCode = variantResult.rows.length === 0 ? 404 : 409;
                 throw error;
             }
 
             const variant = variantResult.rows[0];
 
-            if (variant.price === null || variant.price === undefined) {
+            if (variant.price === null || variant.price === undefined ||
+                !Number.isFinite(Number(variant.price)) ||
+                Number(variant.price) <= 0) {
                 const error = new Error(
                     `Unit price is missing for product ${item.artNumber}.`
                 );

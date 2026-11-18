@@ -830,3 +830,86 @@ body {
         font-size: 11px;
     }
 }
+
+
+/* Mobile layout for navigation */
+@media (max-width: 700px) {
+    .app-container {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: calc(100vh - 70px);
+        overflow: visible;
+    }
+
+    .sidebar {
+        position: static;
+        top: auto;
+        bottom: auto;
+        left: auto;
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        flex-shrink: 0;
+        overflow: visible;
+        border-right: none;
+        border-bottom: 1px solid #263449;
+    }
+
+    .nav-button {
+        width: 100%;
+        min-width: 0;
+        min-height: 52px;
+        padding: 10px;
+        text-align: center;
+    }
+
+    .main-content {
+        width: 100%;
+        min-width: 0;
+        height: auto;
+        flex: 1 1 auto;
+        margin-left: 0;
+        padding: 16px;
+        overflow-x: auto;
+        overflow-y: visible;
+    }
+
+    .dashboard-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+
+/* HAWA TRADERS header alignment */
+
+/* .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.topbar h1 {
+    max-width: none;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.logout-button {
+    position: static;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+    .topbar h1 {
+        font-size: 18px;
+    }
+
+    .logout-button {
+        padding: 8px 10px;
+        font-size: 11px;
+    }
+} */
