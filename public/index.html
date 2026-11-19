@@ -4,10 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Footwear Stock Management</title>
+    <title>HAWA TRADERS | Inventory</title>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/orders.css">
     <link rel="stylesheet" href="/css/hawa-ui.css">
+    <link rel="stylesheet" href="/css/admin-polish.css">
 </head>
 
 <body>
@@ -51,48 +52,62 @@
 
         <main class="main-content">
             
+
 <!-- Dashboard Page -->
 <section id="dashboard-page">
-    <div class="page-header">
-        <h2>Dashboard Overview</h2>
-    </div>
-
+    <div class="page-header"><h2>Dashboard Overview</h2></div>
     <div class="dashboard-cards">
-
         <div class="dashboard-card">
-            <h3>Total Products</h3>
-            <p id="total-products">0</p>
+            <h3>Total Products</h3><p id="total-products">—</p>
         </div>
-
         <div class="dashboard-card">
-            <h3>Total Stock</h3>
-            <p id="total-stock">0</p>
+            <h3>Total Stock</h3><p id="total-stock">—</p>
         </div>
-
         <div class="dashboard-card">
-            <h3>Total Orders</h3>
-            <p id="total-orders">0</p>
+            <h3>Total Orders</h3><p id="total-orders">—</p>
         </div>
-
-        <div class="dashboard-card">
-            <h3>Low Stock</h3>
-            <p id="low-stock">0</p>
-        </div>
-
+        <button type="button" class="dashboard-card dashboard-card-action" id="low-stock-card"
+                aria-controls="low-stock-panel" aria-expanded="false">
+            <h3>Low Stock <span class="dashboard-card-hint">View products</span></h3>
+            <p id="low-stock">—</p>
+        </button>
+        <button type="button" class="dashboard-card dashboard-card-action" id="pending-orders-card">
+            <h3>Pending Orders <span class="dashboard-card-hint">View orders</span></h3>
+            <p id="pending-orders">—</p>
+        </button>
+        <button type="button" class="dashboard-card dashboard-card-action" id="completed-orders-card">
+            <h3>Completed Orders <span class="dashboard-card-hint">View orders</span></h3>
+            <p id="completed-orders">—</p>
+        </button>
     </div>
+    <section id="low-stock-panel" class="low-stock-panel hidden" aria-label="Low stock products">
+        <div class="low-stock-panel-title">
+            <h3>Products with 5 or fewer units</h3>
+            <button type="button" id="close-low-stock" class="secondary-action">Close</button>
+        </div>
+        <div class="stock-table-scroll">
+            <table class="stock-table">
+                <thead><tr><th>Art Number</th><th>Available Units</th><th>Status</th></tr></thead>
+                <tbody id="low-stock-table-body"></tbody>
+            </table>
+        </div>
+        <p id="low-stock-empty" class="hidden">No products are currently low on stock.</p>
+    </section>
 </section>
 
-            <div id="page-head" class="page-header hidden">
-                <h2>PRODUCT</h2>
-                <div class="search-container">
-                <input type="text" id="product-search" placeholder="Search by Art Number.....">
-            </div>
-            
-            <button id="add-stock-button">
-                    +ADD STOCK
-                </button>
-            </div>
-            
+
+<div id="page-head" class="page-header product-toolbar hidden">
+    <h2>PRODUCTS</h2>
+    <div class="search-container">
+        <input type="search" id="product-search" placeholder="Search by art number..." aria-label="Search products by art number">
+    </div>
+    <div class="product-toolbar-actions">
+        <button type="button" id="add-stock-button">+ Add Stock</button>
+        <button type="button" id="add-new-product-button">+ New Product</button>
+        <button type="button" id="add-new-variant-button">+ New Colour</button>
+    </div>
+</div>
+
             <!-- PRODUCT CATALOGUE -->
             <div id="products-container" class="products-grid hidden">
                 Loading products...
@@ -131,9 +146,8 @@
             <div id="add-stock-form" class="hidden">
                 <h2>Add Stock</h2>
 
+                <button type="button" id="back-to-products" class="secondary-action form-back-button">← Back to Products</button>
                 <form id="stock-form" novalidate>
-                <button type ="button" id ="back-to-products">Back</button>
-                <form id="stock-form">
 
                     <label for="stock-art-number">Art Number</label>
                     <input 
@@ -174,13 +188,6 @@
                     
                     <button type = "submit">Add Stock</button>
 
-                    <button type = "button" id = "add-new-variant-button">
-                        + Add New Colour
-                    </button>
-
-                    <button type = "button" id = "add-new-product-button">
-                        + Add New Product
-                    </button>
                 </form>
             </div>
             
@@ -357,86 +364,47 @@
             </div>
             
 
-            <!--ADD-ORDER SECTION-->
-            <div id="add-order-form" class="hidden">
-                <div class="page-header">
-                    <h2 id = "order-form-title">ADD ORDERS</h2>
+
+<!-- ADD / EDIT ORDER -->
+<section id="add-order-form" class="hidden">
+    <div class="page-header order-form-heading">
+        <h2 id="order-form-title">ADD ORDER</h2>
+        <button type="button" id="back-to-order-form" class="secondary-action">← Back to Orders</button>
+    </div>
+    <form id="order-form" novalidate>
+        <label for="order-company-name">Company Name</label>
+        <input type="text" id="order-company-name" placeholder="Enter Company Name" required>
+        <h3 class="order-items-heading">Order Items</h3>
+        <div id="order-items-container">
+            <div class="order-item">
+                <div class="order-item-header">
+                    <strong class="order-item-title">Item 1</strong>
+                    <button type="button" class="remove-order-item secondary-action">Remove Item</button>
                 </div>
-
-
-                <form id = "order-form">
-                    <label for = "order-company-name">
-
-                <button type="button" id="back-to-order-form">Back</button>
-                <form id="order-form">
-                    <lable for="order-company-name">
-
-                        Company Name
-                    </label>
-                    <input  
-                        type = "text"
-                        id = "order-company-name"
-                        placeholder = "Enter Company Name"
-                        required
-                    >
-                 <div id="order-items-container">
-                    <div class="order-item">
-                        <label>
-                       Art No
-                    </label>
-                    <input  
-                        type="text"
-                        class="order-art-number"
-                        placeholder="Enter Art Number"
-                        required
-                    >
-                    <label>
-                        Colour
-                    </label>
-                    <input  
-                        type="text"
-                        class="order-colour"
-                        placeholder="Enter Colour"
-                        required
-                    >
-                    <label>
-                        Size
-                    </label>
-                    <input  
-                        type="number"
-                        min = "1"
-                        step = "1"
-                        class="order-size"
-                        placeholder="Enter Size"
-                        required
-                    >
-                    <label>
-                        Quantity
-                    </label>
-                    <input  
-                        type="number"
-                        min = "1"
-                        step = "1"
-                        class="order-quantity"
-                        placeholder="Enter Quantity"
-                        required
-                    >
-                    <button type="button" id="add-order-item">+ADD ANOTHER ITEM</button>
-                    </div>
-                 </div>   
-                    
-                    <label for="order-address">
-                        Address
-                    </label>
-                    <textarea  
-                        id="order-address"
-                        placeholder="Enter Address"
-                        required
-                    ></textarea>
-                    <button type="submit" id = "save-order-button">SAVE ORDER</button>
-                    <button type="button" id="cancel-order">CANCEL</button>
-                </form>
+                <label>Art No
+                    <input type="text" class="order-art-number" placeholder="Enter Art Number" required>
+                </label>
+                <label>Colour
+                    <input type="text" class="order-colour" placeholder="Enter Colour" required>
+                </label>
+                <label>Size
+                    <input type="number" class="order-size" min="1" step="1" placeholder="Enter Size" required>
+                </label>
+                <label>Quantity
+                    <input type="number" class="order-quantity" min="1" step="1" placeholder="Enter Quantity" required>
+                </label>
             </div>
+        </div>
+        <p id="order-items-empty" class="order-items-empty hidden" role="status">No items added. Use the button below to add an item.</p>
+        <button type="button" id="add-order-item" class="secondary-action">+ Add Another Item</button>
+        <label for="order-address">Address</label>
+        <textarea id="order-address" placeholder="Enter Address" required></textarea>
+        <div class="order-form-actions">
+            <button type="submit" id="save-order-button">SAVE ORDER</button>
+            <button type="button" id="cancel-order" class="secondary-action">CANCEL</button>
+        </div>
+    </form>
+</section>
 
             <!--ORDER-DETAILS PAGE-->
             <div id="order-details-page" class="hidden">

@@ -28,27 +28,31 @@ function orderField(className, row) {
     return row.querySelector(`.${className}`);
 }
 
+
 function createOrderItemRow(item = null) {
     const row = document.createElement("div");
     row.className = "order-item";
-
-    // Static template only: never insert database or user text into HTML strings.
+    // Static markup only; order values are assigned through input.value below.
     row.innerHTML = `
-        <label>Art No</label>
-        <input type="text" class="order-art-number" required>
-        <label>Colour</label>
-        <input type="text" class="order-colour" required>
-        <label>Size</label>
-        <input type="number" class="order-size" min="1" step="1" required>
-        <label>Quantity</label>
-        <input type="number" class="order-quantity" min="1" step="1" required>
-        <button type="button" class="remove-order-item">REMOVE ITEM</button>
+        <div class="order-item-header">
+            <strong class="order-item-title">Order Item</strong>
+            <button type="button" class="remove-order-item secondary-action">Remove Item</button>
+        </div>
+        <label>Art No<input type="text" class="order-art-number" placeholder="Enter Art Number" required></label>
+        <label>Colour<input type="text" class="order-colour" placeholder="Enter Colour" required></label>
+        <label>Size<input type="number" class="order-size" min="1" step="1" placeholder="Enter Size" required></label>
+        <label>Quantity<input type="number" class="order-quantity" min="1" step="1" placeholder="Enter Quantity" required></label>
     `;
-
-    if (item) {
-        populateOrderRow(row, item);
-    }
+    if (item) populateOrderRow(row, item);
     return row;
+}
+
+function updateOrderItemRows() {
+    const rows = [...orderItemsContainer.querySelectorAll(".order-item")];
+    rows.forEach((row, index) => {
+        row.querySelector(".order-item-title").textContent = `Item ${index + 1}`;
+    });
+    document.getElementById("order-items-empty").classList.toggle("hidden", rows.length !== 0);
 }
 
 function populateOrderRow(row, item) {
@@ -58,18 +62,11 @@ function populateOrderRow(row, item) {
     orderField("order-quantity", row).value = item.quantity ?? "";
 }
 
+
 function resetOrderForm() {
     orderForm.reset();
-
-    const rows = [...orderItemsContainer.querySelectorAll(".order-item")];
-    rows.forEach((row, index) => {
-        if (index === 0) {
-            populateOrderRow(row, {});
-        } else {
-            row.remove();
-        }
-    });
-
+    orderItemsContainer.replaceChildren(createOrderItemRow());
+    updateOrderItemRows();
     editingOrderId = null;
     orderFormTitle.textContent = "ADD ORDER";
     saveOrderButton.textContent = "SAVE ORDER";
@@ -289,10 +286,8 @@ async function editOrder(orderId) {
         resetOrderForm();
         document.getElementById("order-company-name").value = order.company_name || "";
         document.getElementById("order-address").value = order.address || "";
-        populateOrderRow(orderItemsContainer.querySelector(".order-item"), order.items[0]);
-        for (const item of order.items.slice(1)) {
-            orderItemsContainer.appendChild(createOrderItemRow(item));
-        }
+        orderItemsContainer.replaceChildren(...order.items.map(createOrderItemRow));
+        updateOrderItemRows();
         editingOrderId = order.id;
         orderFormTitle.textContent = `EDIT ORDER #${order.id}`;
         saveOrderButton.textContent = "UPDATE ORDER";
@@ -363,12 +358,21 @@ cancelOrder.addEventListener("click", () => {
 });
 
 addOrderItemButton.addEventListener("click", () => {
-    orderItemsContainer.appendChild(createOrderItemRow());
+    const row = createOrderItemRow();
+    orderItemsContainer.appendChild(row);
+    updateOrderItemRows();
+    row.querySelector(".order-art-number").focus();
 });
 
 orderItemsContainer.addEventListener("click", event => {
     const removeButton = event.target.closest(".remove-order-item");
-    if (removeButton) removeButton.closest(".order-item")?.remove();
+    if (!removeButton) return;
+    removeButton.closest(".order-item")?.remove();
+    updateOrderItemRows();
+});
+
+document.getElementById("back-to-order-form").addEventListener("click", () => {
+    cancelOrder.click();
 });
 
 orderForm.addEventListener("submit", async event => {

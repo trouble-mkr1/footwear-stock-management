@@ -568,59 +568,48 @@ app.get("/api/products", async (req, res) => {
 });
 
 
-// Dashboard summary API
+
+// Dashboard summary + clickable pending/completed and low-stock details
 app.get("/api/dashboard", async (req, res) => {
     try {
-        // Get total number of products
-        const productResult = await pool.query(`
-            SELECT COUNT(*) AS total_products
-            FROM products
-        `);
-
-        // Get total available stock
-        const stockResult = await pool.query(`
-            SELECT COALESCE(SUM(quantity), 0) AS total_stock
-            FROM stock
-        `);
-
-        // Get total number of orders
-        const orderResult = await pool.query(`
-            SELECT COUNT(*) AS total_orders
-            FROM orders
-        `);
-
-        // Get number of low-stock products
-        const lowStockResult = await pool.query(`
-            SELECT COUNT(*) AS low_stock
-            FROM (
-                SELECT p.art_number
+        const [productResult, stockResult, orderResult, lowStockResult] = await Promise.all([
+            pool.query(`SELECT COUNT(*) AS total_products FROM products`),
+            pool.query(`SELECT COALESCE(SUM(quantity), 0) AS total_stock FROM stock`),
+            pool.query(`
+                SELECT COUNT(*) AS total_orders,
+                       COUNT(*) FILTER (WHERE LOWER(BTRIM(status)) = 'pending') AS pending_orders,
+                       COUNT(*) FILTER (WHERE LOWER(BTRIM(status)) = 'completed') AS completed_orders
+                FROM orders
+            `),
+            pool.query(`
+                SELECT p.art_number,
+                       COALESCE(SUM(s.quantity), 0) AS total_stock
                 FROM products p
-                LEFT JOIN product_variant pv
-                    ON p.art_number = pv.art_number
-                LEFT JOIN stock s
-                    ON pv.id = s.variant_id
+                LEFT JOIN product_variant pv ON pv.art_number = p.art_number
+                LEFT JOIN stock s ON s.variant_id = pv.id
                 GROUP BY p.art_number
                 HAVING COALESCE(SUM(s.quantity), 0) <= 5
-            ) AS low_stock_products
-        `);
+                ORDER BY total_stock ASC, p.art_number ASC
+            `)
+        ]);
 
         res.json({
             totalProducts: Number(productResult.rows[0].total_products),
             totalStock: Number(stockResult.rows[0].total_stock),
             totalOrders: Number(orderResult.rows[0].total_orders),
-            lowStock: Number(lowStockResult.rows[0].low_stock)
+            pendingOrders: Number(orderResult.rows[0].pending_orders),
+            completedOrders: Number(orderResult.rows[0].completed_orders),
+            lowStock: lowStockResult.rows.length,
+            lowStockProducts: lowStockResult.rows.map(row => ({
+                art_number: row.art_number,
+                total_stock: Number(row.total_stock)
+            }))
         });
-
     } catch (error) {
-        console.error("Dashboard Error:", error);
-
-        res.status(500).json({
-            error: "Failed to load dashboard data"
-        });
+        console.error("Dashboard error:", error);
+        res.status(500).json({ error: "Failed to load dashboard data" });
     }
 });
-
-
 
 app.post("/api/stock",async(req, res) => {
     try {

@@ -93,32 +93,74 @@ function validateImageFile(file) {
 
 
 
-// Load Dashboard Summary
-function loadDashboard() {
-    fetch("/api/dashboard")
-        .then(response => {
-            if (!response.ok) {
-                throw new Error("Failed to load dashboard data");
-            }
-            return response.json();
-        })
-        .then(data => {
-            document.getElementById("total-products").textContent =
-                data.totalProducts;
 
-            document.getElementById("total-stock").textContent =
-                data.totalStock;
+// Dashboard summary and low-stock drill-down
+function renderLowStockTable(products) {
+    const rows = document.getElementById("low-stock-table-body");
+    const empty = document.getElementById("low-stock-empty");
+    rows.replaceChildren();
+    const list = Array.isArray(products) ? products : [];
+    empty.classList.toggle("hidden", list.length !== 0);
 
-            document.getElementById("total-orders").textContent =
-                data.totalOrders;
-
-            document.getElementById("low-stock").textContent =
-                data.lowStock;
-        })
-        .catch(error => {
-            console.error("Dashboard Error:", error);
-        });
+    list.forEach(product => {
+        const tr = document.createElement("tr");
+        for (const value of [
+            String(product.art_number),
+            String(product.total_stock),
+            Number(product.total_stock) === 0 ? "Out of stock" : "Low stock"
+        ]) {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            tr.appendChild(cell);
+        }
+        rows.appendChild(tr);
+    });
 }
+
+async function loadDashboard() {
+    try {
+        const response = await fetch("/api/dashboard", { cache: "no-store" });
+        if (!response.ok) throw new Error("Unable to load dashboard.");
+        const data = await response.json();
+        document.getElementById("total-products").textContent = data.totalProducts;
+        document.getElementById("total-stock").textContent = data.totalStock;
+        document.getElementById("total-orders").textContent = data.totalOrders;
+        document.getElementById("low-stock").textContent = data.lowStock;
+        document.getElementById("pending-orders").textContent = data.pendingOrders;
+        document.getElementById("completed-orders").textContent = data.completedOrders;
+        renderLowStockTable(data.lowStockProducts);
+    } catch (error) {
+        console.error("Dashboard error:", error);
+        HawaUI.toast("Dashboard could not refresh. Please try again.", "warning");
+    }
+}
+
+function openOrdersWithStatus(status) {
+    document.getElementById("order-status-filter").value = status;
+    document.getElementById("order-search").value = "";
+    document.getElementById("orders-button").click();
+}
+
+document.getElementById("pending-orders-card").addEventListener("click", () => {
+    openOrdersWithStatus("pending");
+});
+document.getElementById("completed-orders-card").addEventListener("click", () => {
+    openOrdersWithStatus("completed");
+});
+
+const lowStockPanel = document.getElementById("low-stock-panel");
+const lowStockCard = document.getElementById("low-stock-card");
+lowStockCard.addEventListener("click", () => {
+    const show = lowStockPanel.classList.contains("hidden");
+    lowStockPanel.classList.toggle("hidden", !show);
+    lowStockCard.setAttribute("aria-expanded", String(show));
+    if (show) lowStockPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+document.getElementById("close-low-stock").addEventListener("click", () => {
+    lowStockPanel.classList.add("hidden");
+    lowStockCard.setAttribute("aria-expanded", "false");
+    lowStockCard.focus();
+});
 
 // Load dashboard when the page opens
 loadDashboard();
@@ -310,7 +352,6 @@ document.getElementById("back-button").addEventListener("click",()=>{
 });
 
 const backToProductsButton = document.getElementById("back-to-products");
-const backToOrdersFormsButton = document.getElementById("back-to-order-form");
 
 backToProductsButton.addEventListener("click", () => {
     hideAllMainSections();
@@ -320,13 +361,6 @@ backToProductsButton.addEventListener("click", () => {
     updateActiveNav(productButton);
 });
 
-backToOrdersFormsButton.addEventListener("click", () => {
-    hideAllMainSections();
-    ordersPage.classList.remove("hidden");
-
-    updateActiveNav(ordersButton);
-    loadOrders();
-});
 
 //search bar functionality
 const searchInput=document.getElementById("product-search");
@@ -349,12 +383,10 @@ const dashboardButton = document.getElementById("dashboard-button");
 const productButton = document.getElementById("product-button");
 const dashboardPage = document.getElementById("dashboard-page");
 
-addStockButton.addEventListener("click",()=>{
-
-    pageHead.classList.add("hidden");
-    productsContainer.classList.add("hidden");
-    productDetails.classList.add("hidden");
+addStockButton.addEventListener("click", () => {
+    hideAllMainSections();
     addStockForm.classList.remove("hidden");
+    updateActiveNav(productButton);
 });
 
 
@@ -414,12 +446,14 @@ const addNewVariantButton = document.getElementById("add-new-variant-button");
 const addNewVariantForm = document.getElementById("add-new-variant-form");
 
 addNewVariantButton.addEventListener("click", () => {
-    addStockForm.classList.add("hidden");
+    hideAllMainSections();
     addNewVariantForm.classList.remove("hidden");
+    updateActiveNav(productButton);
 });
-addNewProductButton.addEventListener("click",()=>{
-    addStockForm.classList.add("hidden");
+addNewProductButton.addEventListener("click", () => {
+    hideAllMainSections();
     addNewProductForm.classList.remove("hidden");
+    updateActiveNav(productButton);
 });
 
 async function handleAddStock(event){
