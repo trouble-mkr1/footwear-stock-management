@@ -4,8 +4,9 @@
   "description": "Stock and order management system for footwear wholesale business",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server/server.js"
+    "test": "node --test tests/smoke.test.js",
+    "start": "node server/server.js",
+    "test:integration": "node --test tests/integration.test.js"
   },
   "keywords": [],
   "author": "",

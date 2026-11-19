@@ -1,8 +1,14 @@
 node_modules/
 .env
+.env.*
+!.env.example
 
 # Local database dumps and backups
 backups/
 *_backup.sql
 *.backup
 *.dump
+
+# tool output and generated test files
+coverage/
+*.log
