@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account | HAWA TRADERS</title>
+  <link rel="stylesheet" href="/css/customer.css">
+</head>
+<body class="account-page">
+  <main class="account-shell">
+    <a class="brand" href="/" aria-label="HAWA TRADERS home">HAWA <span>TRADERS</span></a>
+    <section class="account-card" aria-labelledby="signup-title">
+      <p class="eyebrow">New customer</p>
+      <h1 id="signup-title">Create an account</h1>
+      <p class="muted">Sign up using your phone number. No email required.</p>
+      <form id="signup-form" class="stack-form">
+        <label for="signup-name">Your name</label>
+        <input id="signup-name" name="name" type="text" autocomplete="name" maxlength="100" required>
+        <label for="signup-phone">Phone number</label>
+        <input id="signup-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="24" placeholder="e.g. 9876543210" required>
+        <label for="signup-shop">Shop name</label>
+        <input id="signup-shop" name="shop_name" type="text" maxlength="100" required>
+        <label for="signup-address">Delivery address</label>
+        <textarea id="signup-address" name="address" rows="3" maxlength="1000" required></textarea>
+        <label for="signup-password">Password <span class="muted">(at least 10 characters)</span></label>
+        <input id="signup-password" type="password" name="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+        <label for="signup-confirm">Confirm password</label>
+        <input id="signup-confirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+        <p class="form-error" id="signup-error" role="alert"></p>
+        <p class="form-success" id="signup-success" role="status"></p>
+        <button class="primary-btn" type="submit" id="signup-button">Create Account</button>
+      </form>
+      <p class="account-foot">Already have an account? <a href="/">Log in</a></p>
+    </section>
+  </main>
+  <script src="/js/signup.js"></script>
+</body>
+</html>

@@ -46,8 +46,8 @@ test("Local configuration example and Git ignore rules protect secrets and uploa
     assert.match(ignore, /(^|\n)storage\/(\r?\n|$)/);
 });
 
-test("Deployment and recovery instructions are documented", () => {
-    const guide = read("docs/DEPLOYMENT_READINESS.md");
+test("Deployment and recovery instructions are documented in the main README", () => {
+    const guide = read("README.md");
     for (const essential of ["HTTPS", "IMAGE_UPLOAD_DIR", "pg_dump", "pg_restore", "/healthz"]) {
         assert.ok(guide.includes(essential), `Guide missing ${essential}`);
     }

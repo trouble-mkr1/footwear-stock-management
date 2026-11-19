@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Account | HAWA TRADERS</title>
+  <link rel="stylesheet" href="/css/hawa-ui.css">
+  <link rel="stylesheet" href="/css/customer.css">
+</head>
+<body class="customer-page">
+  <header class="customer-header">
+    <div class="customer-header-inner">
+      <a class="brand" href="/customer">HAWA <span>TRADERS</span></a>
+      <div class="header-actions">
+        <button type="button" id="contact-button" class="header-btn">Contact Us</button>
+        <button type="button" id="customer-logout" class="header-btn">Log Out</button>
+      </div>
+    </div>
+  </header>
+  <main class="customer-layout">
+    <section class="welcome-banner">
+      <div>
+        <p class="eyebrow">HAWA TRADERS</p>
+        <h1 id="welcome-title">Welcome</h1>
+        <p class="muted" id="welcome-shop">Browse products and place orders easily.</p>
+      </div>
+      <div class="welcome-mark" aria-hidden="true"><span>HT</span></div>
+    </section>
+    <nav class="customer-tabs" aria-label="Customer pages">
+      <button type="button" class="tab-button active" id="customer-products-tab" aria-current="page">Products</button>
+      <button type="button" class="tab-button" id="customer-orders-tab">My Orders</button>
+    </nav>
+    <section id="customer-products-page" aria-labelledby="customer-products-title">
+      <div class="section-heading">
+        <div><h2 id="customer-products-title">Products</h2><p class="muted">Choose a colour, size and quantity to order.</p></div>
+        <span class="cart-chip" id="cart-count" aria-live="polite">0 items</span>
+      </div>
+      <label for="customer-search" class="sr-only">Search by art number</label>
+      <input type="search" id="customer-search" class="product-search" placeholder="Search by art number...">
+      <div id="customer-products" class="customer-product-grid" aria-live="polite"><p class="muted">Loading products...</p></div>
+      <section class="cart-panel" id="customer-cart-panel" aria-labelledby="cart-title">
+        <div class="section-heading"><div><h2 id="cart-title">Your Order</h2><p class="muted">Review items before placing an order.</p></div></div>
+        <div id="customer-cart" aria-live="polite"><p class="muted">Your order is empty.</p></div>
+        <div class="cart-bottom"><strong id="cart-total">Estimated total: ₹0.00</strong><button class="primary-btn" id="place-order-button" type="button" disabled>Place Order</button></div>
+      </section>
+    </section>
+    <section id="customer-orders-page" class="hidden" aria-labelledby="my-orders-title">
+      <div class="section-heading"><div><h2 id="my-orders-title">My Orders</h2><p class="muted">Orders you've placed and their delivery status.</p></div><button type="button" id="refresh-orders" class="outline-btn">Refresh</button></div>
+      <div id="customer-orders" class="customer-orders-list" aria-live="polite"><p class="muted">Loading orders...</p></div>
+    </section>
+  </main>
+  <footer class="customer-footer">HAWA TRADERS · Footwear Wholesale</footer>
+  <script src="/js/hawa-ui.js"></script>
+  <script src="/js/customer.js"></script>
+</body>
+</html>

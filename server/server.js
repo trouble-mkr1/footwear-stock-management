@@ -369,100 +369,145 @@ app.use(session({
 
 
 function requireAdmin(req, res, next) {
-    if (req.session && req.session.isAdmin === true) {
-        return next();
-    }
-
-    return res.status(401).json({
-        error: "Authentication required. Please log in."
-    });
+    if (req.session?.isAdmin === true && req.session?.role !== "customer") return next();
+    return res.status(401).json({ error: "Authentication required. Please log in." });
 }
 
+function requireCustomer(req, res, next) {
+    if (req.session?.role === "customer" && Number.isSafeInteger(req.session.customerId)) return next();
+    return res.status(401).json({ error: "Please log in to your customer account." });
+}
 
+// Only a customer's account can access the customer API; admin APIs stay
+// behind the existing requireAdmin guard further below.
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    message: {
-        error: "Too many login attempts. Please try again after 15 minutes."
-    }
+    message: { error: "Too many attempts. Please try again in 15 minutes." }
+});
+const signupLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many signups. Please try again later." }
 });
 
+// Phone numbers are used only as account identifiers, never as order IDs.
+function normalizePhone(raw) {
+    const value = String(raw ?? "").trim();
+    if (!/^[+0-9()\s-]+$/.test(value)) return null;
+    const digits = value.replace(/\D/g, "");
+    return digits.length >= 10 && digits.length <= 15 ? digits : null;
+}
 
-// Check current login status
+function cleanText(raw, maxLength) {
+    const value = typeof raw === "string" ? raw.trim() : "";
+    return value && value.length <= maxLength ? value : null;
+}
+
+function startLoginSession(req, res, identity) {
+    req.session.regenerate(error => {
+        if (error) {
+            console.error("Session regeneration error:", error);
+            return res.status(500).json({ error: "Unable to create login session." });
+        }
+        req.session.role = identity.role;
+        if (identity.role === "admin") {
+            req.session.isAdmin = true; // Preserve the existing admin middleware.
+            req.session.adminUsername = identity.username;
+        } else {
+            req.session.isAdmin = false;
+            req.session.customerId = identity.customerId;
+            req.session.customerName = identity.customerName;
+        }
+        req.session.save(saveError => {
+            if (saveError) {
+                console.error("Session save error:", saveError);
+                return res.status(500).json({ error: "Unable to save login session." });
+            }
+            return res.json({
+                message: "Login successful.",
+                role: identity.role,
+                redirect: identity.role === "admin" ? "/" : "/customer"
+            });
+        });
+    });
+}
+
 app.get("/api/auth/session", (req, res) => {
-    res.json({
-        authenticated: Boolean(req.session?.isAdmin),
-        username: req.session?.adminUsername || null
+    const admin = req.session?.isAdmin === true && req.session?.role !== "customer";
+    const customer = req.session?.role === "customer" && Number.isSafeInteger(req.session.customerId);
+    return res.json({
+        authenticated: admin || customer,
+        role: admin ? "admin" : customer ? "customer" : null,
+        username: admin ? req.session.adminUsername || null : null,
+        name: customer ? req.session.customerName || null : null
     });
 });
 
-
-// Admin login
+// Shared login: same interface for username and phone number, different roles.
 app.post("/api/auth/login", loginLimiter, async (req, res) => {
+    const username = cleanText(req.body?.username, 100);
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!username || !password) {
+        return res.status(400).json({ error: "Enter your username / phone number and password." });
+    }
     try {
-        const username = String(req.body?.username || "").trim();
-        const password = typeof req.body?.password === "string"
-            ? req.body.password
-            : "";
-
-        if (!username || !password) {
-            return res.status(400).json({
-                error: "Please enter your username and password."
-            });
+        if (username === process.env.ADMIN_USERNAME) {
+            const matches = await bcrypt.compare(password, process.env.ADMIN_PASSWORD_HASH);
+            if (!matches) return res.status(401).json({ error: "Invalid login credentials." });
+            return startLoginSession(req, res, { role: "admin", username });
         }
-
-        if (username !== process.env.ADMIN_USERNAME) {
-            return res.status(401).json({
-                error: "Invalid username or password."
-            });
-        }
-
-        const passwordMatches = await bcrypt.compare(
-            password,
-            process.env.ADMIN_PASSWORD_HASH
+        const phone = normalizePhone(username);
+        if (!phone) return res.status(401).json({ error: "Invalid login credentials." });
+        const result = await pool.query(
+            `SELECT id, name, password_hash FROM customers
+             WHERE regexp_replace(phone, '[^0-9]', '', 'g') = $1`, [phone]
         );
-
-        if (!passwordMatches) {
-            return res.status(401).json({
-                error: "Invalid username or password."
-            });
-        }
-
-        req.session.regenerate(error => {
-            if (error) {
-                console.error("Session regeneration error:", error);
-
-                return res.status(500).json({
-                    error: "Unable to create login session."
-                });
-            }
-
-            req.session.isAdmin = true;
-            req.session.adminUsername = username;
-
-            req.session.save(saveError => {
-                if (saveError) {
-                    console.error("Session save error:", saveError);
-
-                    return res.status(500).json({
-                        error: "Unable to save login session."
-                    });
-                }
-
-                return res.json({
-                    message: "Login successful."
-                });
-            });
+        if (result.rows.length !== 1) return res.status(401).json({ error: "Invalid login credentials." });
+        const customer = result.rows[0];
+        const matches = await bcrypt.compare(password, customer.password_hash);
+        if (!matches) return res.status(401).json({ error: "Invalid login credentials." });
+        return startLoginSession(req, res, {
+            role: "customer", customerId: Number(customer.id), customerName: customer.name
         });
-
     } catch (error) {
-        console.error("Admin login error:", error);
+        console.error("Login error:", error);
+        return res.status(500).json({ error: "Login failed. Please try again." });
+    }
+});
 
-        return res.status(500).json({
-            error: "Login failed. Please try again."
-        });
+// Signup is for customers; role cannot be selected in the request.
+app.post("/api/auth/signup", signupLimiter, async (req, res) => {
+    const name = cleanText(req.body?.name, 100);
+    const shopName = cleanText(req.body?.shop_name, 100);
+    const address = cleanText(req.body?.address, 1000);
+    const phone = normalizePhone(req.body?.phone);
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!name || !shopName || !address || !phone) {
+        return res.status(400).json({ error: "Enter a valid name, phone number, shop name and address." });
+    }
+    if (phone === process.env.ADMIN_USERNAME) {
+        return res.status(400).json({ error: "This phone number cannot be registered." });
+    }
+    if (password.length < 10 || password.length > 128) {
+        return res.status(400).json({ error: "Password must contain 10 to 128 characters." });
+    }
+    try {
+        const hash = await bcrypt.hash(password, 12);
+        await pool.query(
+            `INSERT INTO customers (phone, name, shop_name, address, password_hash)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [phone, name, shopName, address, hash]
+        );
+        return res.status(201).json({ message: "Account created. You can now log in." });
+    } catch (error) {
+        if (error.code === "23505") return res.status(409).json({ error: "This phone number is already registered." });
+        console.error("Customer signup error:", error);
+        return res.status(500).json({ error: "Unable to create account. Please try again." });
     }
 });
 
@@ -496,10 +541,10 @@ app.post("/api/auth/logout", (req, res) => {
 app.get("/", (req, res) => {
     res.set("Cache-Control", "no-store");
     
-    if (req.session?.isAdmin) {
+    if (req.session?.isAdmin && req.session?.role !== "customer") {
         return res.sendFile(path.join(publicDir, "index.html"));
     }
-
+    if (req.session?.role === "customer") return res.redirect("/customer");
     return res.sendFile(path.join(publicDir, "login.html"));
 });
 
@@ -526,6 +571,18 @@ app.get("/billing.html", (req, res) => {
 //     }
 // });
 
+// Serve customer-specific pages only to the appropriate role.
+app.get("/signup", (req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (req.session?.isAdmin || req.session?.role === "customer") return res.redirect("/");
+    return res.sendFile(path.join(publicDir, "signup.html"));
+});
+app.get("/customer", (req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (req.session?.role === "customer") return res.sendFile(path.join(publicDir, "customer.html"));
+    return res.redirect("/");
+});
+
 app.get("/test-db", requireAdmin, async (req, res) => {
     try {
         const result = await pool.query(`
@@ -538,6 +595,178 @@ app.get("/test-db", requireAdmin, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).send("Database connection failed");
+    }
+});
+
+
+// Customer endpoints must be mounted BEFORE the admin-only /api guard.
+// Do not expose stock.quantity (or inferred totals) to customer responses.
+app.use("/api/customer", requireCustomer);
+
+app.get("/api/customer/profile", async (req, res) => {
+    try {
+        const result = await pool.query(
+            "SELECT name, shop_name, phone, address FROM customers WHERE id=$1",
+            [req.session.customerId]
+        );
+        if (!result.rows.length) return res.status(401).json({ error: "Account no longer exists." });
+        return res.json(result.rows[0]);
+    } catch (error) {
+        console.error("Customer profile error:", error);
+        return res.status(500).json({ error: "Unable to load account." });
+    }
+});
+
+app.get("/api/customer/contact", (req, res) => {
+    // Optional client-supplied contact number; do not invent a business phone.
+    return res.json({ phone: process.env.BUSINESS_CONTACT_PHONE || null });
+});
+
+app.get("/api/customer/products", async (req, res) => {
+    try {
+        // Sizes may be shown, but NEVER include current quantities in response.
+        const result = await pool.query(`
+            SELECT p.art_number, p.price, p.mrp,
+                   pv.colour, pv.image,
+                   COALESCE(array_agg(DISTINCT s.size ORDER BY s.size)
+                            FILTER (WHERE s.size IS NOT NULL), ARRAY[]::integer[]) AS sizes
+            FROM products p
+            JOIN product_variant pv ON pv.art_number = p.art_number
+            LEFT JOIN stock s ON s.variant_id = pv.id
+            GROUP BY p.art_number, p.price, p.mrp, pv.id, pv.colour, pv.image
+            ORDER BY p.art_number, pv.colour
+        `);
+        const catalog = new Map();
+        for (const row of result.rows) {
+            if (!catalog.has(row.art_number)) catalog.set(row.art_number, {
+                art_number: row.art_number, price: row.price, mrp: row.mrp, variants: []
+            });
+            catalog.get(row.art_number).variants.push({
+                colour: row.colour, image: row.image, sizes: row.sizes
+            });
+        }
+        res.set("Cache-Control", "no-store");
+        return res.json([...catalog.values()]);
+    } catch (error) {
+        console.error("Customer catalogue error:", error);
+        return res.status(500).json({ error: "Unable to load products." });
+    }
+});
+
+function customerOrderStatus(status) {
+    return String(status || "").trim().toLowerCase() === "completed" ? "Received" : "Yet to Receive";
+}
+
+app.get("/api/customer/orders", async (req, res) => {
+    try {
+        const orders = await pool.query(
+            `SELECT id, company_name, address, status FROM orders
+             WHERE customer_id = $1 ORDER BY id DESC`, [req.session.customerId]
+        );
+        const items = await pool.query(
+            `SELECT oi.order_id, oi.art_number, oi.colour, oi.size,
+                    oi.quantity, oi.unit_price, oi.mrp
+             FROM order_items oi JOIN orders o ON o.id=oi.order_id
+             WHERE o.customer_id=$1 ORDER BY oi.order_id DESC, oi.id`,
+            [req.session.customerId]
+        );
+        const grouped = new Map(orders.rows.map(o => [o.id, {
+            id: o.id, company_name: o.company_name, address: o.address,
+            status: customerOrderStatus(o.status), items: []
+        }]));
+        for (const item of items.rows) {
+            const parent = grouped.get(item.order_id);
+            if (parent) parent.items.push({
+                art_number: item.art_number, colour: item.colour,
+                size: item.size, quantity: item.quantity,
+                unit_price: item.unit_price, mrp: item.mrp
+            });
+        }
+        res.set("Cache-Control", "no-store");
+        return res.json([...grouped.values()]);
+    } catch (error) {
+        console.error("Customer orders error:", error);
+        return res.status(500).json({ error: "Unable to load your orders." });
+    }
+});
+
+app.post("/api/customer/orders", async (req, res) => {
+    let client;
+    try {
+        // Customer identity and shop/address are always taken from the database.
+        const items = validateOrderItems(req.body?.items);
+        if (items.length > 30 || items.some(item => item.quantity > 1000)) {
+            return res.status(400).json({ error: "Please limit each order to 30 items and 1,000 pairs per item." });
+        }
+        client = await pool.connect();
+        await client.query("BEGIN");
+        const customerResult = await client.query(
+            "SELECT shop_name, address FROM customers WHERE id=$1", [req.session.customerId]
+        );
+        if (!customerResult.rows.length) {
+            const error = new Error("Account no longer exists.");
+            error.statusCode = 401;
+            throw error;
+        }
+        const customer = customerResult.rows[0];
+        if (customer.shop_name.length > 100) {
+            const error = new Error("Shop name is too long for an order. Please contact HAWA TRADERS.");
+            error.statusCode = 409;
+            throw error;
+        }
+        const header = await client.query(
+            `INSERT INTO orders (company_name, address, customer_id)
+             VALUES ($1,$2,$3) RETURNING id`,
+            [customer.shop_name, customer.address, req.session.customerId]
+        );
+        const orderId = header.rows[0].id;
+        for (const item of items) {
+            const variantResult = await client.query(
+                `SELECT pv.id, p.price, p.mrp FROM product_variant pv
+                 JOIN products p ON p.art_number=pv.art_number
+                 WHERE pv.art_number=$1
+                   AND LOWER(BTRIM(pv.colour))=LOWER(BTRIM($2::text))`,
+                [item.artNumber, item.colour]
+            );
+            if (variantResult.rows.length !== 1) {
+                const error = new Error("Selected product is no longer available. Please update your order.");
+                error.statusCode = 409;
+                throw error;
+            }
+            const variant = variantResult.rows[0];
+            if (!Number.isFinite(Number(variant.price)) || Number(variant.price) <= 0) {
+                const error = new Error("This product cannot be ordered right now.");
+                error.statusCode = 409;
+                throw error;
+            }
+            const stock = await client.query(
+                `UPDATE stock SET quantity=quantity-$1
+                 WHERE variant_id=$2 AND size=$3 AND quantity >= $1
+                 RETURNING variant_id`,
+                [item.quantity, variant.id, item.size]
+            );
+            if (!stock.rows.length) {
+                const error = new Error("Not enough stock available. Please reduce the order quantity and try again.");
+                error.statusCode = 409;
+                throw error;
+            }
+            await client.query(
+                `INSERT INTO order_items
+                 (order_id,art_number,colour,size,quantity,unit_price,mrp)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+                [orderId,item.artNumber,item.colour,item.size,item.quantity,variant.price,variant.mrp]
+            );
+        }
+        await client.query("COMMIT");
+        return res.status(201).json({ message: "Order placed successfully.", order_id: orderId });
+    } catch (error) {
+        await rollbackQuietly(client);
+        if (!error.statusCode) console.error("Customer order error:", error);
+        return res.status(error.statusCode || 500).json({
+            error: error.statusCode ? error.message : "Unable to place your order. Please try again."
+        });
+    } finally {
+        if (client) client.release();
     }
 });
 

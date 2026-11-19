@@ -66,6 +66,13 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
     const company = `Automated fixture ${suffix}`;
     let variantId;
     let cookie;
+    let customerCookie;
+    let otherCustomerCookie;
+    const customerPhone = String(crypto.randomInt(1000000000, 9999999999));
+    const otherPhone = String(crypto.randomInt(1000000000, 9999999999));
+    let customerId;
+    let otherCustomerId;
+    const shopName = `${company} customer shop`;
     let base;
     let output = "";
 
@@ -85,6 +92,18 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
         return { status: response.status, body, headers: response.headers };
     }
     const item = quantity => [{ art_number: art, colour: "Blue", size: 8, quantity }];
+    async function customerApi(method, route, payload, useOtherCustomer = false) {
+        const headers = { Cookie: useOtherCustomer ? otherCustomerCookie : customerCookie };
+        if (payload !== undefined) headers["Content-Type"] = "application/json";
+        const response = await fetch(base + route, {
+            method, headers, body: payload === undefined ? undefined : JSON.stringify(payload)
+        });
+        return {
+            status: response.status,
+            body: await response.json().catch(() => null),
+            headers: response.headers
+        };
+    }
 
     try {
         // Verify what PostgreSQL actually connected to BEFORE any test writes.
@@ -208,6 +227,110 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             })).status, 409);
             assert.equal(await currentQty(), 18);
         });
+
+        await t.test("Customers can sign up by phone and cannot pick an admin role", async () => {
+            const sign = await api("POST", "/api/auth/signup", {
+                phone: customerPhone, name: "Test Customer", shop_name: shopName,
+                address: "Test customer address", password: "CustomerPassword-123", role: "admin"
+            }, false);
+            assert.equal(sign.status, 201, JSON.stringify(sign.body));
+            const dbCustomer = await pool.query("SELECT id, password_hash FROM customers WHERE phone=$1", [customerPhone]);
+            customerId = dbCustomer.rows[0].id;
+            assert.ok(dbCustomer.rows[0].password_hash.startsWith("$2"));
+            const secondSignup = await api("POST", "/api/auth/signup", {
+                phone: customerPhone, name: "Duplicate", shop_name: shopName,
+                address: "Test", password: "CustomerPassword-123"
+            }, false);
+            assert.equal(secondSignup.status, 409);
+        });
+        await t.test("Shared login creates a customer session and rejects bad passwords", async () => {
+            const bad = await api("POST", "/api/auth/login", {
+                username: customerPhone, password: "incorrect-password"
+            }, false);
+            assert.equal(bad.status, 401);
+            const logged = await api("POST", "/api/auth/login", {
+                username: customerPhone, password: "CustomerPassword-123"
+            }, false);
+            assert.equal(logged.status, 200, JSON.stringify(logged.body));
+            assert.equal(logged.body.role, "customer");
+            assert.equal(logged.body.redirect, "/customer");
+            customerCookie = logged.headers.get("set-cookie")?.split(";")[0];
+            assert.ok(customerCookie?.startsWith("footwear.sid="));
+            const status = await customerApi("GET", "/api/auth/session");
+            assert.equal(status.body.role, "customer");
+            assert.equal(status.body.authenticated, true);
+        });
+        await t.test("Customer can only access customer APIs and never sees stock numbers", async () => {
+            assert.equal((await customerApi("GET", "/api/products")).status, 401);
+            assert.equal((await customerApi("GET", "/api/orders")).status, 401);
+            assert.equal((await customerApi("GET", "/api/dashboard")).status, 401);
+            assert.equal((await api("GET", "/api/customer/products")).status, 401,
+                "Admin must not be treated as customer");
+            const products = await customerApi("GET", "/api/customer/products");
+            assert.equal(products.status, 200, JSON.stringify(products.body));
+            const testProduct = products.body.find(p => p.art_number === art);
+            assert.ok(testProduct, "Test product missing from catalogue");
+            assert.deepEqual(testProduct.variants[0].sizes, [8]);
+            assert.equal(JSON.stringify(products.body).includes('"quantity"'), false);
+            assert.equal(JSON.stringify(products.body).includes('"stock"'), false);
+        });
+        await t.test("Over-stock customer order rolls back without exposing the stock count", async () => {
+            const before = await currentQty();
+            const r = await customerApi("POST", "/api/customer/orders", {items: item(999)});
+            assert.equal(r.status, 409, JSON.stringify(r.body));
+            assert.match(r.body.error, /Not enough stock/);
+            assert.equal(await currentQty(), before);
+            const partial = await customerApi("POST", "/api/customer/orders", {
+                items: [...item(1), ...item(999)]
+            });
+            assert.equal(partial.status, 409);
+            assert.equal(await currentQty(), before);
+        });
+        await t.test("Customer order uses account identity and is not editable by customer", async () => {
+            const r = await customerApi("POST", "/api/customer/orders", {
+                company_name: "Spoofed shop", address: "Spoofed address", items: item(3)
+            });
+            assert.equal(r.status, 201, JSON.stringify(r.body));
+            const data = await pool.query("SELECT customer_id, company_name, address, status FROM orders WHERE id=$1", [r.body.order_id]);
+            assert.equal(data.rows[0].customer_id, customerId);
+            assert.equal(data.rows[0].company_name, shopName);
+            assert.equal(data.rows[0].address, "Test customer address");
+            assert.equal(await currentQty(), 15);
+            const listing = await customerApi("GET", "/api/customer/orders");
+            assert.equal(listing.status, 200);
+            assert.equal(listing.body.find(o => o.id === r.body.order_id).status, "Yet to Receive");
+            assert.equal((await customerApi("PUT", `/api/orders/${r.body.order_id}`, {
+                company_name: shopName, address: "x", items: item(1)
+            })).status, 401);
+            assert.equal((await customerApi("DELETE", `/api/orders/${r.body.order_id}`)).status, 401);
+        });
+        await t.test("Other customers cannot see someone else's order history", async () => {
+            const sign = await api("POST", "/api/auth/signup", {
+                phone: otherPhone, name: "Other Customer", shop_name: "Unrelated Shop",
+                address: "Somewhere else", password: "CustomerPassword-456"
+            }, false);
+            assert.equal(sign.status, 201, JSON.stringify(sign.body));
+            otherCustomerId = (await pool.query("SELECT id FROM customers WHERE phone=$1", [otherPhone])).rows[0].id;
+            const login = await api("POST", "/api/auth/login", {
+                username: otherPhone, password: "CustomerPassword-456"
+            }, false);
+            assert.equal(login.status, 200, JSON.stringify(login.body));
+            otherCustomerCookie = login.headers.get("set-cookie")?.split(";")[0];
+            const orders = await customerApi("GET", "/api/customer/orders", undefined, true);
+            assert.equal(orders.status, 200);
+            assert.deepEqual(orders.body, []);
+        });
+        await t.test("Admin completion displays as Received; reorder is a NEW order", async () => {
+            const before = await customerApi("GET", "/api/customer/orders");
+            const id = before.body[0].id;
+            assert.equal((await api("PUT", `/api/orders/${id}/complete`)).status, 200);
+            const delivered = await customerApi("GET", "/api/customer/orders");
+            assert.equal(delivered.body.find(o => o.id === id).status, "Received");
+            const reorder = await customerApi("POST", "/api/customer/orders", {items: item(2)});
+            assert.equal(reorder.status, 201, JSON.stringify(reorder.body));
+            assert.notEqual(reorder.body.order_id, id);
+            assert.equal(await currentQty(), 13);
+        });
     } catch (err) {
         err.message += `\nTest server output:\n${output}`;
         throw err;
@@ -216,6 +339,15 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
         // Clean up ONLY our isolated fixture, even after a failed assertion.
         // Test order IDs are located using their unique company name.
         try {
+            // Delete customer fixture orders before the customer rows (FK restrict).
+            for (const phone of [customerPhone, otherPhone]) {
+                const customers = await pool.query("SELECT id FROM customers WHERE phone=$1", [phone]);
+                for (const row of customers.rows) {
+                    await pool.query("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE customer_id=$1)", [row.id]);
+                    await pool.query("DELETE FROM orders WHERE customer_id=$1", [row.id]);
+                    await pool.query("DELETE FROM customers WHERE id=$1", [row.id]);
+                }
+            }
             if (variantId !== undefined) {
                 await pool.query("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE company_name=$1)", [company]);
                 await pool.query("DELETE FROM orders WHERE company_name=$1", [company]);

@@ -1,8 +1,8 @@
 # HAWA TRADERS — Footwear Stock Management
 
-Admin-facing web application for footwear catalogue, stock management, orders and printable invoices. Built with **Node.js / Express**, **PostgreSQL**, and vanilla **HTML / CSS / JavaScript**.
+Footwear stock management and customer ordering application with admin dashboard, customer catalogue, order history and printable invoices. Built with **Node.js / Express**, **PostgreSQL**, and vanilla **HTML / CSS / JavaScript**.
 
-> **Project status:** The admin workflow is implemented. Customer accounts and the customer dashboard are planned for a later milestone. Do not deploy publicly before completing a production security review and configuring HTTPS, backups and persistent image storage.
+> **Project status:** Admin and customer flows are implemented for local testing. Do not launch publicly until phone ownership verification, password-recovery support, final security review, HTTPS, backups and persistent image storage have been implemented/tested.
 
 ## Requirements
 
@@ -14,7 +14,6 @@ Admin-facing web application for footwear catalogue, stock management, orders an
 ## Local setup (Windows / PowerShell)
 
 1. Clone the repository, or open your existing `footwear-stock-management` folder in VS Code.
-
 2. Install dependencies:
 
    ```powershell
@@ -23,29 +22,24 @@ Admin-facing web application for footwear catalogue, stock management, orders an
 
 3. Copy `.env.example` to `.env`:
 
-   in powershell, run:
-
+   ```powershell
    Copy-Item .env.example .env
-   
+   ```
 
 4. Update `.env` with your **local** PostgreSQL values (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`). Use the existing project database or restore a backup to your local PostgreSQL instance.
-
 5. Create admin credentials in `.env`:
 
-   in powershell, run:
-
+   ```powershell
    node -e "require('bcryptjs').hash('REPLACE_WITH_A_STRONG_PASSWORD', 12).then(console.log)"
    node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
-   
+   ```
 
    Paste the bcrypt output into `ADMIN_PASSWORD_HASH`, and the random secret into `SESSION_SECRET`. Set `ADMIN_USERNAME` to your desired admin username. Never commit `.env`.
-
 6. Start:
 
-   in powershell, run:
-
+   ```powershell
    npm start
-   
+   ```
 
 7. Open http://localhost:3000 and log in.
 
@@ -53,30 +47,28 @@ Admin-facing web application for footwear catalogue, stock management, orders an
 
 - `public/index.html`: Admin dashboard, Products and Orders sections
 - `public/billing.html`: Invoice / billing page
-- `public/login.html`: Admin login page
-
+- `public/login.html`: Shared login for username / phone number and password
+- `public/signup.html`: Phone-based customer signup
+- `public/customer.html`: Customer Products and My Orders pages
+- `public/js/customer.js`: Customer catalogue, cart, order history and Order Again
 - `public/js/script.js`: Dashboard and Product/Stock UI
 - `public/js/orders.js`: Order list, filters, edit/delete/complete actions
 - `public/js/billing.js`: Invoice rendering
 - `public/js/hawa-ui.js`: Custom dialogs and toast notifications
-
-- `public/css/`: Styles and responsive layouts
-
+- `public/css/`: Blue-and-white styles and responsive layouts
 - `server/server.js`: Express API, login sessions, product/stock/order operations
 - `server/db.js`: PostgreSQL connection pool
-
-- `database/migrations/001_normalized_colour_unique.sql`: Applied/retained database migration
-
+- `database/migrations/001_normalized_colour_unique.sql`: Normalized product colour index
+- `database/migrations/002_customer_accounts.sql`: Customer phone uniqueness and order ownership
 - `tests/`: Safe smoke tests and optional isolated-database integration tests
 
 ## Automated tests
 
 ### Non-destructive smoke checks (recommended first)
 
-in powershell, run:
-
+```powershell
 npm test
-
+```
 
 Runs Node syntax checks, checks local frontend asset references and duplicate element IDs, verifies key dashboard and order markup, and checks that the admin API guard is placed before private routes. **No database connection or modifications are made.**
 
@@ -85,22 +77,20 @@ Runs Node syntax checks, checks local frontend asset references and duplicate el
 These tests add, edit, complete and delete **temporary** orders and products. They refuse to run unless you deliberately opt in and provide a separate database name ending with `_test`.
 
 1. Back up your normal database. Create a **separate** database in pgAdmin named exactly `footwear_inventory_test`.
-
-2. Populate this test database with the project schema. The easiest route today is to restore a copy of your existing PostgreSQL custom-format backup into this **new empty database** using pgAdmin's **Restore** action. Never restore onto your normal `footwear_inventory_new` database by mistake. The existing migration can be run against the test copy if necessary.
-
+2. Populate this test database with the project schema. The easiest route today is to restore a copy of your existing PostgreSQL custom-format backup into this **new empty database** using pgAdmin's **Restore** action. Never restore onto your normal `footwear_inventory_new` database by mistake. Apply migration 002 in the test copy if it is not yet present.
 3. In your **local** `.env` file, add:
 
-   TEST_DB_NAME = footwear_inventory_test
-   
+   ```env
+   TEST_DB_NAME=footwear_inventory_test
+   ```
 
 4. In PowerShell (in the project folder) run:
 
-   in powershell, run:
-
+   ```powershell
    $env:RUN_DB_TESTS="YES_I_WANT_TO_TEST"
    npm run test:integration
    Remove-Item Env:RUN_DB_TESTS
-   
+   ```
 
 These tests launch a second server on an available local port with an independent admin account and session secret, and connect it only to `TEST_DB_NAME`. They first check `SELECT current_database()` before inserting any fixtures. They exercise authentication, stock deductions, historical price preservation, order edits, rollback, deletes and completed-order protections. They remove their own fixtures afterward, even when a test fails. The normal database is not modified by this suite.
 
@@ -129,8 +119,42 @@ These tests launch a second server on an available local port with an independen
 - [ ] Replace local image uploads with persistent storage or a configured persistent disk
 - [ ] Establish scheduled database backups and regularly test restoring them
 - [ ] Keep `.env`, database backups and customer records out of Git
-- [ ] Add customer permission separation and perform customer/admin access tests
+- [x] Add separate customer routes, account roles and stock-hidden catalogue responses
+- [ ] Add verified phone ownership and secure password-recovery flows before public signup
+- [ ] Perform full customer/admin isolation and concurrency tests against the isolated test database
 
 ## Git workflow
 
 Implement features on `develop`, test locally, push `develop`, then merge to `main` after verification. Do not copy real `.env` or backups into Git.
+
+## Customer account migration and testing (Milestone 6)
+
+**Back up your real database first.** In pgAdmin, execute `database/migrations/002_customer_accounts.sql` **once against `footwear_inventory_new`**, then run it against the separate `footwear_inventory_test` database. Both databases must have the existing `customers`, `orders`, and `order_items` tables. The migration is additive and repeatable: it creates a normalized unique phone index, adds `orders.customer_id` (nullable for historical/admin orders), and an order index. It refuses to apply if existing customer phone numbers would conflict when formatting characters are removed. Do not discard existing orders.
+
+The shared login at `/` accepts **Username / Phone No.** and **Password**. Only a recognized account type is routed to its corresponding dashboard. New customers register at `/signup` using a phone number, shop name and address. Customer pages are at `/customer`. A customer-only API never returns stock quantity; it checks requested quantities **transactionally when an order is placed**. Customer order statuses are **Yet to Receive** when admin status is `Pending`, and **Received** when admin status is `Completed` (treated as delivered for now). "Order Again" copies items into a new draft and requires fresh confirmation; it does not charge or reserve stock when clicked. Customer order editing after submission is not enabled.
+
+**Customer contact:** Set `BUSINESS_CONTACT_PHONE` in your local `.env` when the client supplies a business number. Without it, Contact Us displays an honest placeholder; no number is invented.
+
+After running the migration in both databases:
+
+```powershell
+npm test
+$env:RUN_DB_TESTS="YES_I_WANT_TO_TEST"
+npm run test:integration
+Remove-Item Env:RUN_DB_TESTS
+```
+
+The integration tests refuse to run unless `TEST_DB_NAME` ends with `_test` and differs from `DB_NAME`. Check the schema **before** running integration tests. Run `npm start` and manually test both account roles, a successful and a failed customer order, delivered status after admin Complete, Order Again, logout, mobile layouts and Contact Us.
+
+## Deployment and recovery essentials
+
+The server's `/healthz` endpoint checks database availability. Production requires HTTPS for secure session cookies and an absolute, existing, writable `IMAGE_UPLOAD_DIR` pointing to persistent storage. Configure `DB_SSL_MODE=require` and the PostgreSQL CA chain as appropriate for the host. Do not allow raw database backups, `.env`, or private uploads to be served publicly.
+
+Use `pg_dump` to create **private** backups and `pg_restore` to test them in a separate database; test a restore regularly. Example (replace the host, database and destination with your local private values):
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe" -Fc -d footwear_inventory_new -f "C:\private-backups\footwear.backup"
+& "C:\Program Files\PostgreSQL\18\bin\pg_restore.exe" --list "C:\private-backups\footwear.backup"
+```
+
+A successful listing is not a complete recovery test; actually restore into an isolated, disposable database and validate table counts and a sample read. The website remains **development-only** until client-approved phone verification, password recovery, security and deployment testing are completed.

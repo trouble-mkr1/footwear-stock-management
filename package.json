@@ -4,7 +4,7 @@
   "description": "Stock and order management system for footwear wholesale business",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/smoke.test.js tests/production-readiness.test.js",
+    "test": "node --test tests/smoke.test.js tests/production-readiness.test.js tests/customer.smoke.test.js",
     "start": "node server/server.js",
     "test:integration": "node --test tests/integration.test.js"
   },

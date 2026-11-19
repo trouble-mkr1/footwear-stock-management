@@ -1,58 +1,29 @@
-
 <!DOCTYPE html>
-<html lang = "en">
-
+<html lang="en">
 <head>
-    <meta charset = "UTF-8">
-    <meta name = "viewport" content = "width=device-width, initial-scale=1.0">
-    <title>Admin Login | HAWA TRADERS</title>
-    <link rel = "stylesheet" href = "/css/style.css">
-    <link rel="stylesheet" href="/css/admin-polish.css">
-
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | HAWA TRADERS</title>
+  <link rel="stylesheet" href="/css/customer.css">
 </head>
-
-<body>
-
-    <main class = "login-page">
-        <section class = "login-card">
-
-            <h2>HAWA TRADERS</h2>
-
-            <p class = "login-subtitle">Admin Login</p>
-
-            <form id = "login-form">
-
-                <label for = "username">Username</label>
-                <input
-                    type = "text"
-                    id = "username"
-                    name = "username"
-                    autocomplete = "username"
-                    required
-                >
-
-                <label for = "password">Password</label>
-                <input
-                    type = "password"
-                    id = "password"
-                    name = "password"
-                    autocomplete = "current-password"
-                    required
-                >
-
-                <p id = "login-error" role = "alert"></p>
-
-                <button type = "submit" id = "login-button">
-                    LOGIN
-                </button>
-
-            </form>
-
-        </section>
-    </main>
-
-    <script src = "/js/login.js"></script>
-
+<body class="account-page">
+  <main class="account-shell">
+    <a class="brand" href="/" aria-label="HAWA TRADERS home">HAWA <span>TRADERS</span></a>
+    <section class="account-card" aria-labelledby="login-title">
+      <p class="eyebrow">Welcome back</p>
+      <h1 id="login-title">Sign in</h1>
+      <p class="muted">Enter your login details to continue.</p>
+      <form id="login-form" class="stack-form">
+        <label for="username">Username / Phone No.</label>
+        <input type="text" id="username" name="username" autocomplete="username" placeholder="Username / Phone No." maxlength="100" required>
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Enter password" required>
+        <p class="form-error" id="login-error" role="alert"></p>
+        <button type="submit" id="login-button" class="primary-btn">Login</button>
+      </form>
+      <p class="account-foot">New to HAWA TRADERS? <a href="/signup">Create an account</a></p>
+    </section>
+  </main>
+  <script src="/js/login.js"></script>
 </body>
 </html>

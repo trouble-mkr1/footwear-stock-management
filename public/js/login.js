@@ -1,41 +1,26 @@
+"use strict";
 const loginForm = document.getElementById("login-form");
 const loginError = document.getElementById("login-error");
 const loginButton = document.getElementById("login-button");
-
-loginForm.addEventListener("submit", async (event) => {
+loginForm.addEventListener("submit", async event => {
     event.preventDefault();
-
     loginError.textContent = "";
     loginButton.disabled = true;
-    loginButton.textContent = "LOGGING IN...";
-
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value;
-
+    loginButton.textContent = "Logging in...";
     try {
         const response = await fetch("/api/auth/login", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                username,
-                password
+                username: document.getElementById("username").value.trim(),
+                password: document.getElementById("password").value
             })
         });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.error || "Login failed.");
-        }
-
-        // Login successful, open the admin dashboard
-        window.location.replace("/");
-
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Login failed.");
+        window.location.replace(data.redirect === "/customer" ? "/customer" : "/");
     } catch (error) {
         loginError.textContent = error.message;
         loginButton.disabled = false;
-        loginButton.textContent = "LOGIN";
+        loginButton.textContent = "Login";
     }
 });

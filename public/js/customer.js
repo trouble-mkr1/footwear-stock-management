@@ -1,0 +1,297 @@
+(() => {
+    "use strict";
+    const byId = id => document.getElementById(id);
+    const productsPage = byId("customer-products-page");
+    const ordersPage = byId("customer-orders-page");
+    const productsTab = byId("customer-products-tab");
+    const ordersTab = byId("customer-orders-tab");
+    const state = { products: [], orders: [], cart: [] };
+
+    function node(tag, className, text) {
+        const el = document.createElement(tag);
+        if (className) el.className = className;
+        if (text !== undefined) el.textContent = String(text);
+        return el;
+    }
+    const money = amount => `₹${Number(amount || 0).toLocaleString("en-IN", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    function showPage(page) {
+        const products = page === "products";
+        productsPage.classList.toggle("hidden", !products);
+        ordersPage.classList.toggle("hidden", products);
+        productsTab.classList.toggle("active", products);
+        ordersTab.classList.toggle("active", !products);
+        if (products) {
+            productsTab.setAttribute("aria-current", "page");
+            ordersTab.removeAttribute("aria-current");
+        } else {
+            ordersTab.setAttribute("aria-current", "page");
+            productsTab.removeAttribute("aria-current");
+            loadOrders();
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    async function api(route, options = {}) {
+        const response = await fetch(route, options);
+        if (response.status === 401) {
+            window.location.replace("/");
+            throw new Error("Please sign in again.");
+        }
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || "Something went wrong. Please try again.");
+        return data;
+    }
+    function imageFor(variant) {
+        if (!variant?.image || !/^[a-zA-Z0-9_.-]+$/.test(variant.image)) return null;
+        return `/images/${encodeURIComponent(variant.image)}`;
+    }
+    function findProduct(art) { return state.products.find(p => p.art_number === art); }
+
+    function renderProducts() {
+        const list = byId("customer-products");
+        list.replaceChildren();
+        const search = byId("customer-search").value.trim().toLowerCase();
+        const products = state.products.filter(p => String(p.art_number).toLowerCase().includes(search));
+        if (!products.length) {
+            list.appendChild(node("p", "empty-state", "No products found."));
+            return;
+        }
+        for (const product of products) {
+            const card = node("article", "product-card");
+            const picture = node("img", "product-image");
+            picture.alt = `Footwear art number ${product.art_number}`;
+            picture.loading = "lazy";
+            const fallback = node("div", "product-image-fallback", "Footwear");
+            function updatePicture(variant) {
+                const src = imageFor(variant);
+                if (!src) { picture.remove(); if (!fallback.isConnected) card.prepend(fallback); return; }
+                fallback.remove();
+                picture.src = src;
+                if (!picture.isConnected) card.prepend(picture);
+            }
+            picture.addEventListener("error", () => {
+                picture.remove();
+                if (!fallback.isConnected) card.prepend(fallback);
+            });
+            const body = node("div", "product-card-body");
+            const header = node("div", "product-card-header");
+            header.append(node("h3", "", `Art No: ${product.art_number}`), node("span", "price", money(product.price)));
+            body.append(header);
+            const variantField = node("div", "field");
+            const variantLabel = node("label", "", "Colour");
+            const variants = node("select");
+            for (const variant of product.variants || []) {
+                const option = node("option", "", variant.colour);
+                option.value = variant.colour;
+                variants.appendChild(option);
+            }
+            variantLabel.append(variants); variantField.append(variantLabel);
+            const fields = node("div", "row-fields");
+            const sizeField = node("div", "field");
+            const sizeLabel = node("label", "", "Size");
+            const sizes = node("select");
+            sizeLabel.appendChild(sizes); sizeField.appendChild(sizeLabel);
+            const qtyField = node("div", "field");
+            const qtyLabel = node("label", "", "Quantity");
+            const quantity = node("input");
+            quantity.type = "number"; quantity.min = "1"; quantity.max = "1000"; quantity.step = "1"; quantity.value = "1";
+            qtyLabel.appendChild(quantity); qtyField.appendChild(qtyLabel);
+            fields.append(sizeField, qtyField);
+            const addButton = node("button", "primary-btn", "Add to Order");
+            addButton.type = "button";
+            function updateVariant() {
+                const selected = (product.variants || []).find(v => v.colour === variants.value);
+                sizes.replaceChildren();
+                for (const size of selected?.sizes || []) {
+                    const option = node("option", "", size);
+                    option.value = String(size);
+                    sizes.appendChild(option);
+                }
+                addButton.disabled = sizes.options.length === 0;
+                updatePicture(selected);
+            }
+            variants.addEventListener("change", updateVariant);
+            addButton.addEventListener("click", () => {
+                const qty = Number(quantity.value);
+                if (!Number.isInteger(qty) || qty < 1 || qty > 1000 || !sizes.value) {
+                    HawaUI.alert("Enter a valid quantity (1–1000) and select a size.");
+                    return;
+                }
+                const art = product.art_number, colour = variants.value, size = Number(sizes.value);
+                const existing = state.cart.find(i => i.art_number === art && i.colour === colour && i.size === size);
+                if (existing) {
+                    if (existing.quantity + qty > 1000) {
+                        HawaUI.alert("Please limit each item to 1,000 pairs."); return;
+                    }
+                    existing.quantity += qty;
+                } else {
+                    if (state.cart.length >= 30) {
+                        HawaUI.alert("Maximum 30 items in one order."); return;
+                    }
+                    state.cart.push({art_number: art, colour, size, quantity: qty});
+                }
+                renderCart();
+                HawaUI.toast("Added to your order.");
+            });
+            body.append(variantField, fields, addButton);
+            card.appendChild(body);
+            list.appendChild(card);
+            updateVariant();
+        }
+    }
+
+    function renderCart() {
+        const cart = byId("customer-cart");
+        cart.replaceChildren();
+        const count = state.cart.reduce((sum, item) => sum + item.quantity, 0);
+        byId("cart-count").textContent = `${state.cart.length} item types`;
+        byId("place-order-button").disabled = state.cart.length === 0;
+        if (!state.cart.length) {
+            cart.appendChild(node("p", "muted", "Your order is empty."));
+        }
+        let total = 0;
+        for (const item of state.cart) {
+            const product = findProduct(item.art_number);
+            const price = Number(product?.price || 0);
+            total += price * item.quantity;
+            const row = node("div", "cart-item");
+            const info = node("div");
+            info.append(node("strong", "", `Art ${item.art_number} · ${item.colour} · Size ${item.size}`),
+                node("p", "", `${money(price)} per pair`));
+            const input = node("input");
+            input.type = "number"; input.min = "1"; input.max = "1000"; input.step = "1";
+            input.value = String(item.quantity); input.setAttribute("aria-label", `Quantity for art ${item.art_number}`);
+            input.addEventListener("change", () => {
+                const value = Number(input.value);
+                if (!Number.isInteger(value) || value < 1 || value > 1000) {
+                    input.value = String(item.quantity);
+                    HawaUI.toast("Quantity must be between 1 and 1,000.", "warning");
+                    return;
+                }
+                item.quantity = value; renderCart();
+            });
+            const remove = node("button", "cart-remove", "Remove");
+            remove.type = "button";
+            remove.addEventListener("click", () => {
+                state.cart = state.cart.filter(entry => entry !== item);
+                renderCart();
+            });
+            row.append(info, input, remove); cart.append(row);
+        }
+        byId("cart-total").textContent = `Estimated total: ${money(total)}`;
+    }
+
+    async function placeOrder() {
+        if (!state.cart.length) return;
+        const approved = await HawaUI.confirm("Place this order with the selected items and quantities?", {
+            title: "Confirm Order", confirmText: "Place Order"
+        });
+        if (!approved) return;
+        const button = byId("place-order-button");
+        button.disabled = true;
+        try {
+            const result = await api("/api/customer/orders", {
+                method: "POST", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ items: state.cart })
+            });
+            state.cart = []; renderCart();
+            HawaUI.toast(`Order #${result.order_id} placed successfully.`);
+            showPage("orders");
+        } catch (error) {
+            await HawaUI.alert(error.message, {title: "Unable to place order"});
+        } finally {
+            button.disabled = state.cart.length === 0;
+        }
+    }
+
+    function renderOrders() {
+        const list = byId("customer-orders");
+        list.replaceChildren();
+        if (!state.orders.length) {
+            list.appendChild(node("p", "empty-state", "You have not placed any orders yet."));
+            return;
+        }
+        for (const order of state.orders) {
+            const card = node("article", "customer-order-card");
+            const header = node("div", "customer-order-header");
+            const delivered = order.status === "Received";
+            header.append(node("h3", "", `Order #${order.id}`),
+                node("span", `delivery-tag ${delivered ? "delivered" : "pending"}`, order.status));
+            card.appendChild(header);
+            const items = node("ul", "order-detail-list");
+            let total = 0;
+            for (const item of order.items || []) {
+                total += Number(item.unit_price || 0) * Number(item.quantity || 0);
+                items.appendChild(node("li", "", `Art ${item.art_number} · ${item.colour} · Size ${item.size} · Qty ${item.quantity} · ${money(item.unit_price)} per pair`));
+            }
+            card.append(items);
+            const summary = node("div", "order-summary");
+            summary.appendChild(node("strong", "", `Order total: ${money(total)}`));
+            if (delivered) {
+                const reorder = node("button", "outline-btn", "Order Again");
+                reorder.type = "button";
+                reorder.addEventListener("click", () => {
+                    const copied = (order.items || []).map(item => ({
+                        art_number: item.art_number, colour: item.colour,
+                        size: Number(item.size), quantity: Number(item.quantity)
+                    }));
+                    if (!copied.length) return;
+                    if (copied.length > 30) { HawaUI.alert("Too many items to reorder together."); return; }
+                    state.cart = copied;
+                    renderCart();
+                    showPage("products");
+                    byId("customer-cart-panel").scrollIntoView({behavior: "smooth", block: "start"});
+                    HawaUI.toast("Previous items copied. Review current prices and quantities before placing your order.", "warning");
+                });
+                summary.appendChild(reorder);
+            }
+            card.appendChild(summary);
+            list.appendChild(card);
+        }
+    }
+
+    async function loadOrders() {
+        try {
+            state.orders = await api("/api/customer/orders");
+            renderOrders();
+        } catch (error) {
+            byId("customer-orders").replaceChildren(node("p", "empty-state", error.message));
+        }
+    }
+
+    async function contact() {
+        try {
+            const result = await api("/api/customer/contact");
+            await HawaUI.alert(result.phone
+                ? `Call HAWA TRADERS: ${result.phone}`
+                : "Contact details will be added by HAWA TRADERS soon.", {title:"Contact Us"});
+        } catch (error) { await HawaUI.alert(error.message); }
+    }
+
+    async function boot() {
+        productsTab.addEventListener("click", () => showPage("products"));
+        ordersTab.addEventListener("click", () => showPage("orders"));
+        byId("customer-search").addEventListener("input", renderProducts);
+        byId("place-order-button").addEventListener("click", placeOrder);
+        byId("refresh-orders").addEventListener("click", loadOrders);
+        byId("contact-button").addEventListener("click", contact);
+        byId("customer-logout").addEventListener("click", async () => {
+            try {
+                await api("/api/auth/logout", {method:"POST"});
+                window.location.replace("/");
+            } catch (error) { HawaUI.alert(error.message); }
+        });
+        try {
+            const [profile, products] = await Promise.all([
+                api("/api/customer/profile"), api("/api/customer/products")
+            ]);
+            byId("welcome-title").textContent = `Welcome, ${profile.name}`;
+            byId("welcome-shop").textContent = profile.shop_name;
+            state.products = products;
+            renderProducts();
+            renderCart();
+        } catch (error) {
+            byId("customer-products").replaceChildren(node("p", "empty-state", error.message));
+        }
+    }
+    boot();
+})();
