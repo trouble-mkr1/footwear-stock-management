@@ -12,3 +12,6 @@ backups/
 # tool output and generated test files
 coverage/
 *.log
+
+# Optional local directory for persistent product-image uploads
+storage/

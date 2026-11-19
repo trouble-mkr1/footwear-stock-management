@@ -122,6 +122,11 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
         child.stderr.on("data", data => { output = (output + data.toString()).slice(-4000); });
         await pollUntilReady(base, child);
 
+        await t.test("Health endpoint reports PostgreSQL readiness without authentication", async () => {
+            const r = await api("GET", "/healthz", undefined, false);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+            assert.deepEqual(r.body, { status: "ok" });
+        });
         await t.test("Private API requires login", async () => {
             assert.equal((await api("GET", "/api/products", undefined, false)).status, 401);
             assert.equal((await api("POST", "/api/orders", {

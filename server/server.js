@@ -15,6 +15,25 @@ const app = express();
 
 const publicDir = path.join(__dirname, "../public");
 
+// A persistent mount can be configured by IMAGE_UPLOAD_DIR on the hosting provider.
+// Without it, local development continues using the existing public/images folder.
+const bundledImagesDir = path.join(publicDir, "images");
+const imageUploadDir = process.env.IMAGE_UPLOAD_DIR
+    ? path.resolve(process.env.IMAGE_UPLOAD_DIR)
+    : bundledImagesDir;
+
+// A production mount must already exist and be writable; do not silently
+// create a directory on an ephemeral filesystem when the mount is missing.
+if (process.env.NODE_ENV === "production") {
+    if (!process.env.IMAGE_UPLOAD_DIR || !path.isAbsolute(process.env.IMAGE_UPLOAD_DIR)) {
+        throw new Error("Production requires an absolute IMAGE_UPLOAD_DIR on a persistent mount.");
+    }
+    fs.accessSync(imageUploadDir, fs.constants.R_OK | fs.constants.W_OK);
+} else {
+    // Preserve the existing localhost behavior; create custom local folders.
+    fs.mkdirSync(imageUploadDir, { recursive: true });
+}
+
 if (!process.env.SESSION_SECRET) {
     throw new Error("SESSION_SECRET is missing from .env");
 }
@@ -29,7 +48,7 @@ if (process.env.NODE_ENV === "production") {
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, path.join(__dirname, "../public/images"));
+        cb(null, imageUploadDir);
     },
 
     filename: (req, file, cb) => {
@@ -302,7 +321,28 @@ app.use(express.json({ limit: "100kb" }));
 // Serve public assets
 app.use("/css", express.static(path.join(publicDir, "css")));
 app.use("/js", express.static(path.join(publicDir, "js")));
-app.use("/images", express.static(path.join(publicDir, "images")));
+// New uploads are served from the persistent directory when one is configured.
+app.use("/images", express.static(imageUploadDir));
+
+// Existing catalog images bundled with the application remain accessible.
+if (imageUploadDir !== bundledImagesDir) {
+    app.use("/images", express.static(bundledImagesDir));
+}
+
+// Hosting platforms can probe this endpoint without an admin session.
+// Never include database credentials or exception details in the response.
+app.get("/healthz", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+
+    try {
+        await pool.query("SELECT 1");
+        return res.status(200).json({ status: "ok" });
+    } catch (error) {
+        console.error("Database health check failed:", error.message);
+        return res.status(503).json({ status: "unavailable" });
+    }
+});
+
 
 // PostgreSQL-backed login sessions
 app.use(session({
