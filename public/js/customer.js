@@ -75,11 +75,19 @@
             });
             const body = node("div", "product-card-body");
             const header = node("div", "product-card-header");
-            header.append(node("h3", "", `Art No: ${product.art_number}`), node("span", "price", money(product.price)));
+            const pricing = node("div", "customer-pricing");
+            pricing.appendChild(node("span", "price", `Unit: ${money(product.price)}`));
+            if (product.mrp !== null && product.mrp !== undefined && product.mrp !== '' && Number(product.mrp) > 0) {
+                pricing.appendChild(node("span", "customer-mrp", `MRP: ${money(product.mrp)}`));
+            }
+            header.append(node("h3", "", `Art No: ${product.art_number}`), pricing);
             body.append(header);
             if (product.brand) body.append(node("p", "muted", `Brand: ${product.brand}`));
-            if (Array.isArray(product.tags) && product.tags.length)
-                body.append(node("p", "muted", `Tags: ${product.tags.join(', ')}`));
+            if (Array.isArray(product.tags) && product.tags.length) {
+                const chips = node('div', 'customer-tags');
+                for (const tag of product.tags) chips.appendChild(node('span', 'customer-tag', tag));
+                body.appendChild(chips);
+            }
             const variantField = node("div", "field");
             const variantLabel = node("label", "", "Colour");
             const variants = node("select");

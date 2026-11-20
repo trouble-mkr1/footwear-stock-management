@@ -224,6 +224,38 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             assert.equal(Number(rows.rows.find(r=>r.colour==='Green' && r.size===8).quantity),4);
         });
 
+        await t.test('Bulk mixed stock and new colour saves atomically', async () => {
+            const result = await bulk('stock', {
+                art_number: matrixArt,
+                variants: [
+                    {colour:'Black',new_colour:false,sizes:[{size:6,quantity:3}]},
+                    {colour:'Purple',new_colour:true,sizes:[{size:44,quantity:7}]}
+                ]
+            },1);
+            assert.equal(result.status,200,JSON.stringify(result.body));
+            const rows = await pool.query(`SELECT pv.colour,s.size,s.quantity FROM stock s
+                JOIN product_variant pv ON pv.id=s.variant_id WHERE pv.art_number=$1`,[matrixArt]);
+            assert.equal(Number(rows.rows.find(r=>r.colour==='Black' && r.size===6).quantity),15);
+            assert.equal(Number(rows.rows.find(r=>r.colour==='Purple' && r.size===44).quantity),7);
+        });
+        await t.test('Bulk mixed submission rolls back stock on duplicate new colour', async () => {
+            const before = await pool.query(`SELECT s.quantity FROM stock s
+                JOIN product_variant pv ON pv.id=s.variant_id
+                WHERE pv.art_number=$1 AND pv.colour='Black' AND s.size=6`,[matrixArt]);
+            const failed = await bulk('stock',{
+                art_number:matrixArt,
+                variants:[
+                    {colour:'Black',new_colour:false,sizes:[{size:6,quantity:8}]},
+                    {colour:'Purple',new_colour:true,sizes:[{size:44,quantity:2}]}
+                ]
+            },1);
+            assert.equal(failed.status,409,JSON.stringify(failed.body));
+            const after = await pool.query(`SELECT s.quantity FROM stock s
+                JOIN product_variant pv ON pv.id=s.variant_id
+                WHERE pv.art_number=$1 AND pv.colour='Black' AND s.size=6`,[matrixArt]);
+            assert.equal(Number(after.rows[0].quantity),Number(before.rows[0].quantity));
+        });
+
         await t.test("Invalid and over-stock order requests do not change stock", async () => {
             assert.equal((await api("POST", "/api/orders", {
                 company_name: company, address: "test", items: []

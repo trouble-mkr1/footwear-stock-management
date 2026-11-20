@@ -848,7 +848,8 @@ app.post('/api/inventory/bulk', bulkInventoryUpload, async (req, res) => {
             if (!colour || colour.length > 60) bulkInputError('Each colour must be 1–60 characters.');
             if (usedColours.has(key)) bulkInputError(`Duplicate colour: ${colour}.`);
             usedColours.add(key);
-            return { colour, sizes: validBulkSizes(v.sizes, mode, colour) };
+            return { colour, sizes: validBulkSizes(v.sizes, mode, colour),
+                newColour: mode === 'stock' && v.new_colour === true };
         });
         if (mode === 'product') {
             if (!Number.isFinite(Number(body.price)) || Number(body.price) <= 0 ||
@@ -865,11 +866,10 @@ app.post('/api/inventory/bulk', bulkInventoryUpload, async (req, res) => {
             bulkInputError('Tags must be unique and at most 40 characters.');
         const hasPositiveStock = variants.some(v => v.sizes.some(s => s.quantity > 0));
         if (mode !== 'stock' && !hasPositiveStock) bulkInputError('Enter stock for at least one size.');
-        if (mode === 'stock' && files.length) bulkInputError('Stock updates do not need new images.');
-        if (mode !== 'stock') {
-            if (files.length !== variants.length) bulkInputError('Provide one image for every new colour.');
-            if (files.some(f => f.fieldname !== 'images')) bulkInputError('Unexpected image field.');
-        }
+        const requiredImages = mode === 'stock'
+            ? variants.filter(v => v.newColour).length : variants.length;
+        if (files.length !== requiredImages) bulkInputError('Provide one photo for each new colour only.');
+        if (files.some(f => f.fieldname !== 'images')) bulkInputError('Unexpected image field.');
 
         client = await pool.connect();
         await client.query('BEGIN');
@@ -884,15 +884,25 @@ app.post('/api/inventory/bulk', bulkInventoryUpload, async (req, res) => {
             const existing = await client.query('SELECT art_number FROM products WHERE art_number=$1 FOR UPDATE', [art]);
             if (!existing.rows.length) bulkInputError(`Art number ${art} does not exist.`, 404);
         }
+        let nextNewColourImage = 0;
         for (const [index, variant] of variants.entries()) {
             let variantId;
             if (mode === 'stock') {
                 const match = await client.query(
                     'SELECT id FROM product_variant WHERE art_number=$1 AND lower(btrim(colour))=lower(btrim($2::text))',
                     [art, variant.colour]);
-                if (match.rows.length !== 1) bulkInputError(
-                    `Art ${art}, colour ${variant.colour}: expected one existing colour.`, 409);
-                variantId = match.rows[0].id;
+                if (variant.newColour) {
+                    if (match.rows.length) bulkInputError(
+                        `Colour ${variant.colour} already exists for art ${art}. Refresh and add its stock instead.`, 409);
+                    const added = await client.query(
+                        'INSERT INTO product_variant (art_number, colour, image) VALUES ($1,$2,$3) RETURNING id',
+                        [art, variant.colour, files[nextNewColourImage++].filename]);
+                    variantId = added.rows[0].id;
+                } else {
+                    if (match.rows.length !== 1) bulkInputError(
+                        `Colour ${variant.colour} no longer matches art ${art}. Refresh and retry.`, 409);
+                    variantId = match.rows[0].id;
+                }
             } else {
                 const added = await client.query(
                     'INSERT INTO product_variant (art_number, colour, image) VALUES ($1,$2,$3) RETURNING id',
@@ -916,7 +926,7 @@ app.post('/api/inventory/bulk', bulkInventoryUpload, async (req, res) => {
         await client.query('COMMIT');
         return res.status(mode === 'stock' ? 200 : 201).json({
             message: mode === 'product' ? 'Product and all colours saved.'
-                : mode === 'colour' ? 'New colours and sizes saved.' : 'Stock updated for all selected sizes.'
+                : mode === 'colour' ? 'New colours and sizes saved.' : 'Stock and new colours saved.'
         });
     } catch (error) {
         await rollbackQuietly(client);

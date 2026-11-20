@@ -55,7 +55,7 @@ test("Order filter, product actions and dashboard drill-down elements exist", ()
     const html = read("public/index.html");
     for (const id of [
         "order-status-filter", "orders-container", "order-items-container", "add-order-item",
-        "add-stock-button", "add-new-product-button", "add-new-variant-button",
+        "add-stock-button", "add-new-product-button",
         "pending-orders-card", "completed-orders-card", "low-stock-card", "low-stock-table-body"
     ]) {
         assert.match(html, new RegExp(`\\bid\\s*=\\s*["']${id}["']`), `Missing ${id}`);

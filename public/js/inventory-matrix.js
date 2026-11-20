@@ -40,9 +40,9 @@
         const card = document.createElement('div');
         card.className = 'matrix-colour-card';
         const colourNumber = colours.children.length + 1;
-        const imageFields = mode === 'stock' ? '' : `
+        const imageFields = `
             <div class="matrix-image-fields">
-                <label>Choose Photo
+                <label>Photo for this colour
                     <input class="matrix-image" type="file" accept="image/jpeg,image/png,image/webp" required>
                 </label>
                 <img class="matrix-preview hidden" alt="Selected colour photo preview">
@@ -55,6 +55,7 @@
             <label>Colour Name
                 <input class="matrix-colour-name" list="matrix-existing-colours" maxlength="60" placeholder="e.g. Black" required autocomplete="off">
             </label>
+            <p class="matrix-colour-status matrix-muted" aria-live="polite"></p>
             ${imageFields}
             <div class="matrix-sizes-heading"><h4>Sizes and quantities</h4>
                 <span class="matrix-muted">Add size rows as needed</span></div>
@@ -62,6 +63,7 @@
             <button type="button" class="matrix-add-size secondary-action">+ Add Size</button>`;
         colours.appendChild(card);
         addSize(card);
+        updateColourCard(card);
         updateColourHeadings();
     }
 
@@ -100,6 +102,40 @@
         tagInput.value = ''; renderTags();
     }
 
+    function selectedProduct() {
+        return allProducts.find(product => String(product.art_number) === art.value.trim());
+    }
+
+    function updateColourCard(card) {
+        const status = card.querySelector('.matrix-colour-status');
+        const imageFields = card.querySelector('.matrix-image-fields');
+        const imageInput = card.querySelector('.matrix-image');
+        const name = card.querySelector('.matrix-colour-name').value.trim().toLowerCase();
+        const product = selectedProduct();
+        const existing = mode === 'stock' && product?.variants?.find(
+            variant => variant.colour.trim().toLowerCase() === name);
+        const hasNewColour = mode !== 'stock' || (Boolean(product) && Boolean(name) && !existing);
+        const shouldShowImage = mode === 'product' || mode === 'colour' || hasNewColour;
+        imageFields.classList.toggle('hidden', !shouldShowImage);
+        imageInput.required = shouldShowImage;
+        card.dataset.newColour = mode === 'stock' && hasNewColour ? 'true' : 'false';
+        if (!shouldShowImage && imageInput.files.length) {
+            imageInput.value = '';
+            const preview = card.querySelector('.matrix-preview');
+            preview.classList.add('hidden');
+            preview.removeAttribute('src');
+        }
+        if (mode === 'stock') {
+            status.textContent = !product ? 'Select an existing art number first.'
+                : !name ? 'Enter a colour name to check existing colours.'
+                : existing ? 'Existing colour — enter quantities to ADD to stock. No image required.'
+                : 'New colour — add an image and enter its initial sizes and quantities.';
+        } else {
+            status.textContent = 'Add a photo and any sizes needed for this new colour.';
+        }
+        card.querySelectorAll('.matrix-size-row').forEach(row => updateCurrentStock(row));
+    }
+
     function updateExistingColourSuggestions() {
         let list = el('matrix-existing-colours');
         if (!list) {
@@ -107,17 +143,17 @@
             area.appendChild(list);
         }
         list.replaceChildren();
-        const product = allProducts.find(p => String(p.art_number) === art.value.trim());
+        const product = selectedProduct();
         for (const variant of product?.variants || []) {
             const option = document.createElement('option'); option.value = variant.colour;
             list.appendChild(option);
         }
-        colours.querySelectorAll('.matrix-size-row').forEach(updateCurrentStock);
+        [...colours.children].forEach(updateColourCard);
     }
 
     function updateCurrentStock(row) {
         if (mode !== 'stock') return;
-        const product = allProducts.find(p => String(p.art_number) === art.value.trim());
+        const product = selectedProduct();
         const name = row.closest('.matrix-colour-card')?.querySelector('.matrix-colour-name')?.value.trim().toLowerCase();
         const variant = product?.variants?.find(v => v.colour.trim().toLowerCase() === name);
         const size = Number(row.querySelector('.matrix-size').value);
@@ -135,12 +171,11 @@
         el('matrix-brand').required = isProduct;
         el('matrix-price').required = isProduct;
         el('matrix-mrp').required = isProduct;
-        heading.textContent = isProduct ? 'Add New Product' : mode === 'colour' ? 'Add New Colour' : 'Add Stock';
+        heading.textContent = isProduct ? 'Add New Product' : 'Add Stock / New Colour';
         el('matrix-intro').textContent = isProduct
             ? 'Add multiple colours and any sizes in a single save.'
-            : mode === 'colour' ? 'Select an existing art number, then add new colours and sizes.'
-            : 'Select an existing art number and colour, then add quantities for multiple sizes.';
-        save.textContent = isProduct ? 'Save Product' : mode === 'colour' ? 'Save New Colour(s)' : 'Add Stock';
+            : 'Select an existing art number. Enter a colour: existing colours add stock; new colours ask for an image.';
+        save.textContent = isProduct ? 'Save Product' : 'Save Stock and Colours';
         art.placeholder = isProduct ? 'New art number' : 'Existing art number';
         const dataList = el('matrix-art-options'); dataList.replaceChildren();
         if (!isProduct) for (const product of allProducts) {
@@ -154,7 +189,6 @@
 
     addStockButton.addEventListener('click', () => open('stock'));
     addNewProductButton.addEventListener('click', () => open('product'));
-    addNewVariantButton.addEventListener('click', () => open('colour'));
     el('matrix-back').addEventListener('click', returnToProductsPage);
     el('matrix-cancel').addEventListener('click', returnToProductsPage);
     addColour.addEventListener('click', addColourCard);
@@ -172,7 +206,8 @@
     colours.addEventListener('input', e => {
         if (e.target.matches('.matrix-size,.matrix-colour-name')) {
             const card = e.target.closest('.matrix-colour-card');
-            card.querySelectorAll('.matrix-size-row').forEach(updateCurrentStock);
+            if (e.target.matches('.matrix-colour-name')) updateColourCard(card);
+            else card.querySelectorAll('.matrix-size-row').forEach(updateCurrentStock);
         }
     });
     colours.addEventListener('change', e => {
@@ -192,6 +227,9 @@
         commitTags();
         const data = { mode, art_number: art.value.trim() };
         if (!data.art_number) throw Error('Enter an art number.');
+        if (mode === 'stock' && !selectedProduct()) {
+            throw Error('Select an existing art number before adding stock or a new colour.');
+        }
         if (mode === 'product') {
             data.brand = el('matrix-brand').value.trim();
             data.price = Number(el('matrix-price').value);
@@ -222,12 +260,15 @@
                 used.add(size);
                 return { size, quantity };
             });
-            if (mode !== 'stock') {
+            const existing = mode === 'stock' && selectedProduct()?.variants?.some(
+                variant => variant.colour.trim().toLowerCase() === colour.toLowerCase());
+            const newColour = mode === 'stock' && !existing;
+            if (mode !== 'stock' || newColour) {
                 const file = card.querySelector('.matrix-image').files[0];
-                if (!file) throw Error(`Choose an image for ${colour}.`);
+                if (!file) throw Error(`Choose an image for the new colour ${colour}.`);
                 files.push(file);
             }
-            return { colour, sizes };
+            return { colour, sizes, new_colour: newColour };
         });
         if (new Set(data.variants.map(v => v.colour.toLowerCase())).size !== data.variants.length)
             throw Error('Each colour must have a different name.');

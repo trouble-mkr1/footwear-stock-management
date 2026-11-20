@@ -203,11 +203,7 @@ async function refreshProducts() {
             .getElementById("product-search")
             .value.trim();
 
-        const filteredProducts = allProducts.filter(product =>
-            String(product.art_number).includes(searchText)
-        );
-
-        displayProducts(filteredProducts);
+        displayProducts(filterAdminProducts(searchText));
 
         return true;
 
@@ -217,106 +213,119 @@ async function refreshProducts() {
     }
 }
 
+function filterAdminProducts(search) {
+    const query = String(search || '').trim().toLocaleLowerCase();
+    if (!query) return allProducts;
+    return allProducts.filter(product => [
+        String(product.art_number), product.brand || '',
+        ...(Array.isArray(product.tags) ? product.tags : []),
+        ...((product.variants || []).map(variant => variant.colour || ''))
+    ].some(value => String(value).toLocaleLowerCase().includes(query)));
+}
+
+function adminText(tag, className, value) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    element.textContent = String(value);
+    return element;
+}
+
+const formatAdminCurrency = value => {
+    if (value === null || value === undefined || value === '') return 'Not set';
+    const amount = Number(value);
+    return Number.isFinite(amount) ? `₹${amount.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : 'Not set';
+};
+
+function renderAdminTags(tags, className = 'admin-tag-list') {
+    const list = document.createElement('div');
+    list.className = className;
+    for (const tag of (Array.isArray(tags) ? tags : [])) {
+        list.appendChild(adminText('span', 'admin-tag', tag));
+    }
+    return list;
+}
+
 function displayProducts(products) {
-    const container = document.getElementById("products-container");
+    const container = document.getElementById('products-container');
     container.replaceChildren();
 
-    if (!products || products.length === 0) {
-        const message = document.createElement("p");
-        message.textContent = "No Products Found";
-        container.appendChild(message);
+    if (!products?.length) {
+        container.appendChild(adminText('p', 'admin-no-results', 'No products found.'));
         return;
     }
 
     products.forEach(product => {
-        let totalStock = 0;
-        let image = "";
-
-        product.variants.forEach(variant => {
-            image = variant.image;
-
-            variant.stock.forEach(stockItem => {
-                totalStock += Number(stockItem.quantity);
-            });
-        });
-
-        const card = document.createElement("div");
-        card.className = "product-card";
-
-        const productImage = document.createElement("img");
-        productImage.className = "product-image";
-        productImage.alt = `Footwear ${product.art_number}`;
-
+        const totalStock = (product.variants || []).reduce((sum, variant) =>
+            sum + (variant.stock || []).reduce((n, row) => n + Number(row.quantity || 0), 0), 0);
+        const image = product.variants?.find(v => v.image)?.image;
+        const card = document.createElement('article');
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.className = 'product-card admin-product-card';
+        card.setAttribute('aria-label', `View product ${product.art_number}`);
         if (image) {
-            productImage.src = `/images/${encodeURIComponent(image)}`;
+            const picture = document.createElement('img');
+            picture.className = 'product-image';
+            picture.alt = `Footwear ${product.art_number}`;
+            picture.loading = 'lazy';
+            picture.src = `/images/${encodeURIComponent(image)}`;
+            card.appendChild(picture);
         }
-
-        const info = document.createElement("div");
-        info.className = "product-info";
-
-        const artNumber = document.createElement("h3");
-        artNumber.textContent = `Art No: ${product.art_number}`;
-
-        const mrp = document.createElement("p");
-        mrp.textContent = `MRP: ₹${product.mrp ?? "Not Set"}`;
-
-        const price = document.createElement("p");
-        price.textContent = `Unit Price: ₹${product.price}`;
-
-        const brand = document.createElement("p");
-        brand.textContent = `Brand: ${product.brand || "Not Set"}`;
-
-        const tags = document.createElement("p");
-        tags.textContent = Array.isArray(product.tags) && product.tags.length
-            ? `Tags: ${product.tags.join(", ")}` : "";
-
-        const stock = document.createElement("p");
-        stock.textContent = totalStock > 0
-            ? `Available Stock: ${totalStock}`
-            : "Out of Stock";
-
-        info.append(artNumber, brand, tags, mrp, price, stock);
-        card.append(productImage, info);
-
-        card.addEventListener("click", () => {
-            showProductDetails(product);
+        const info = document.createElement('div');
+        info.className = 'product-info';
+        info.appendChild(adminText('h3', 'admin-product-title', `Art No: ${product.art_number}`));
+        info.appendChild(adminText('span', 'admin-brand-label', product.brand || 'Unbranded'));
+        const prices = document.createElement('div');
+        prices.className = 'admin-product-prices';
+        prices.appendChild(adminText('span', 'admin-product-price', `Unit price ${formatAdminCurrency(product.price)}`));
+        prices.appendChild(adminText('span', 'admin-product-mrp', `MRP ${formatAdminCurrency(product.mrp)}`));
+        info.appendChild(prices);
+        if (Array.isArray(product.tags) && product.tags.length) info.appendChild(renderAdminTags(product.tags));
+        info.appendChild(adminText('p', `admin-stock-label ${totalStock > 0 ? 'in-stock' : 'out-of-stock'}`,
+            totalStock > 0 ? `Total stock: ${totalStock}` : 'Out of stock'));
+        card.appendChild(info);
+        card.addEventListener('click', () => showProductDetails(product));
+        card.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                showProductDetails(product);
+            }
         });
-
         container.appendChild(card);
     });
 }
 
-// shows product details 
-function showProductDetails(product){
-    const productsContainer=document.getElementById("products-container");
-    const productDetails=document.getElementById("product-details");
-    
-
-    //Hide Catalogue Ass
-    productsContainer.classList.add("hidden");//basically calling from css bro
-    //shows product  info
-    productDetails.classList.remove("hidden");
-    document.getElementById("details-art-number").textContent=`Art No:${product.art_number}`;
-    document.getElementById("details-price").textContent=
-        `Brand: ${product.brand || "Not Set"} | MRP: ₹${product.mrp ?? "Not Set"} | Unit Price: ₹${product.price}`;
-    const colourButtons=document.getElementById("colour-buttons");
-    colourButtons.innerHTML="";
-
-    product.variants.forEach((variant,index)=>{
-        const button=document.createElement("button");
-        button.textContent=variant.colour;
-        button.className="colour-button";
-        button.addEventListener("click",()=>{
-            showVariant(variant,product.variants);
-        });
+function showProductDetails(product) {
+    const productsContainer = document.getElementById('products-container');
+    const productDetails = document.getElementById('product-details');
+    productsContainer.classList.add('hidden');
+    productDetails.classList.remove('hidden');
+    document.getElementById('details-art-number').textContent = `Art No: ${product.art_number}`;
+    const priceBox = document.getElementById('details-price');
+    priceBox.replaceChildren();
+    for (const [label, value] of [
+        ['Brand / Company', product.brand || 'Unbranded'],
+        ['MRP', formatAdminCurrency(product.mrp)],
+        ['Unit price', formatAdminCurrency(product.price)]
+    ]) {
+        const fact = document.createElement('div');
+        fact.className = 'details-fact';
+        fact.append(adminText('span', 'details-fact-name', label), adminText('strong', '', value));
+        priceBox.appendChild(fact);
+    }
+    const tagBox = document.getElementById('details-tags');
+    tagBox.replaceChildren(renderAdminTags(product.tags, 'admin-tag-list'));
+    const colourButtons = document.getElementById('colour-buttons');
+    colourButtons.replaceChildren();
+    (product.variants || []).forEach((variant, index) => {
+        const button = adminText('button', 'colour-button', variant.colour);
+        button.type = 'button';
+        button.addEventListener('click', () => showVariant(variant));
         colourButtons.appendChild(button);
-        if(index===0){//shows first variant from the table 
-            showVariant(variant,product.variants);
-            button.classList.add("active-colour");
-        }
+        if (index === 0) showVariant(variant);
     });
-
 }
+
 //fetching variant details 
 function showVariant(selectedVariant, allVariants) {
     const image = document.getElementById("details-image");
@@ -363,17 +372,12 @@ document.getElementById("back-button").addEventListener("click",()=>{
 const searchInput=document.getElementById("product-search");
 searchInput.addEventListener("input",()=>{
     const searchText=searchInput.value.trim();
-    const filteredProducts=allProducts.filter(product=>{
-        return product.art_number.toString()
-        .includes(searchText);
-    });
-    displayProducts(filteredProducts);
+    displayProducts(filterAdminProducts(searchText));
 });
 
 // Inventory matrix actions are handled in inventory-matrix.js.
 const addStockButton = document.getElementById("add-stock-button");
 const addNewProductButton = document.getElementById("add-new-product-button");
-const addNewVariantButton = document.getElementById("add-new-variant-button");
 const productsContainer = document.getElementById("products-container");
 const productDetails = document.getElementById("product-details");
 const pageHead = document.getElementById("page-head");

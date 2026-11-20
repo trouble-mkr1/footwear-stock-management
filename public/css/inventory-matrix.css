@@ -35,3 +35,5 @@
 #inventory-matrix-page .hidden { display:none!important; }
 @media (max-width:700px) { .matrix-fields { grid-template-columns:1fr; } .matrix-section,.matrix-colour-card,.matrix-footer {padding:14px;} .matrix-heading-bar {flex-direction:column;} .matrix-size-row {grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;} .matrix-current-stock {grid-column:1 / -1; order:1;} .matrix-tag-entry {flex-wrap:wrap;} }
 @media (max-width:390px) { .matrix-actions {flex-direction:column; align-items:stretch;} .matrix-size-row {gap:6px; padding:8px;} }
+
+.matrix-colour-status { padding:9px 11px; border:1px solid #d8e7f9; background:#f1f7ff; color:#1d4f87; border-radius:8px; margin:10px 0; }

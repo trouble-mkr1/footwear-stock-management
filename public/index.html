@@ -100,12 +100,11 @@
 <div id="page-head" class="page-header product-toolbar hidden">
     <h2>PRODUCTS</h2>
     <div class="search-container">
-        <input type="search" id="product-search" placeholder="Search by art number..." aria-label="Search products by art number">
+        <input type="search" id="product-search" placeholder="Search art number, brand, colour or tag..." aria-label="Search products by art number, brand, colour or tag">
     </div>
     <div class="product-toolbar-actions">
-        <button type="button" id="add-stock-button">+ Add Stock</button>
+        <button type="button" id="add-stock-button">+ Stock / New Colour</button>
         <button type="button" id="add-new-product-button">+ New Product</button>
-        <button type="button" id="add-new-variant-button">+ New Colour</button>
     </div>
 </div>
 
@@ -122,25 +121,27 @@
                     Back
                 </button>
 
-                <h2 id="details-art-number"></h2>
-
-                <p id="details-price"></p>
-
-                <img id="details-image" class="details-image" alt="Product image">
-
-                <h3>Colour</h3>
-
-                <div id="colour-buttons"></div>
-                <h3>Available Stock</h3>
-                <table class="stock-table">
-                    <thead>
-                        <tr>
-                            <th>Size</th>
-                            <th>Quantity</th>
-                        </tr>
-                    </thead>
-                    <tbody id="stock-table-body"></tbody>
-                </table>
+                <div class="details-heading-row">
+                    <h2 id="details-art-number"></h2>
+                </div>
+                <div id="details-price" class="details-facts" aria-label="Product details"></div>
+                <div id="details-tags" class="details-tags" aria-label="Product tags"></div>
+                <div class="details-layout">
+                    <div class="details-visual">
+                        <img id="details-image" class="details-image" alt="Selected product colour">
+                    </div>
+                    <div class="details-stock-panel">
+                        <h3>Available Colours</h3>
+                        <div id="colour-buttons"></div>
+                        <h3>Size-wise Available Stock</h3>
+                        <div class="stock-table-scroll">
+                            <table class="stock-table">
+                                <thead><tr><th>Size</th><th>Quantity</th></tr></thead>
+                                <tbody id="stock-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- All inventory actions share one size/colour matrix. -->
@@ -182,7 +183,7 @@
                     <div id="matrix-colours" class="matrix-colours"></div>
                     <div class="matrix-footer">
                         <button type="button" id="matrix-add-colour" class="secondary-action">+ Add Another Colour</button>
-                        <p class="matrix-muted">Each colour has its own photo and size quantities. Add as many size rows as needed.</p>
+                        <p class="matrix-muted">Existing colours keep their photo. A new colour will request a photo automatically. Add any sizes you need.</p>
                         <div class="matrix-actions">
                             <button type="button" id="matrix-cancel" class="secondary-action">Cancel</button>
                             <button type="submit" id="matrix-save">Save Inventory</button>
