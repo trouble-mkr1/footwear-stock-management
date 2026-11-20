@@ -1,0 +1,37 @@
+/* Colour cards with user-defined size rows; scoped to avoid touching Orders/Billing. */
+#inventory-matrix-page { max-width: 1080px; margin: 0 auto; }
+.matrix-heading-bar { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:18px; }
+.matrix-heading-bar h2 { margin:0 0 7px; }
+.matrix-muted { color:#64748b; font-size:13px; margin:6px 0; line-height:1.5; }
+.matrix-section,.matrix-colour-card,.matrix-footer { background:#fff; border:1px solid #dce7f5; border-radius:14px; padding:20px; margin-bottom:16px; box-shadow:0 2px 7px rgba(22,58,103,.05); }
+.matrix-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+#inventory-matrix-page label { font-size:14px; font-weight:600; color:#263b5a; display:block; }
+#inventory-matrix-page input:not([type=file]) { display:block; width:100%; box-sizing:border-box; margin-top:7px; padding:10px 12px; min-height:42px; border:1px solid #c4d6e9; border-radius:8px; color:#18324f; background:#fff; font:inherit; }
+#inventory-matrix-page input:focus-visible { outline:2px solid #2674d9; outline-offset:1px; }
+.matrix-tag-area { margin-top:18px; }
+.matrix-tag-entry { display:flex; align-items:end; gap:8px; margin-top:5px; }
+.matrix-tag-entry input { flex:1; }
+.matrix-tags { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+.matrix-tag { display:inline-flex; align-items:center; gap:7px; padding:5px 9px; background:#e8f2ff; border-radius:30px; font-size:13px; color:#1251a2; }
+.matrix-tag button { border:0; background:transparent; color:inherit; cursor:pointer; font-size:18px; padding:0; line-height:1; }
+.matrix-card-header,.matrix-sizes-heading { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+.matrix-card-header h3 { margin:0; font-size:18px; color:#163f83; }
+.matrix-colour-card>label { max-width:480px; margin:16px 0; }
+.matrix-image-fields { display:flex; align-items:center; gap:16px; margin:14px 0; flex-wrap:wrap; }
+.matrix-image-fields label { flex:1; min-width:160px; }
+.matrix-image-fields input { display:block; max-width:100%; margin-top:8px; font-size:13px; }
+.matrix-preview { width:90px; height:90px; object-fit:cover; border:1px solid #d8e5f5; border-radius:10px; }
+.matrix-sizes-heading h4 { margin:12px 0 6px; color:#263b5a; }
+.matrix-size-rows { display:grid; gap:10px; margin:12px 0; }
+.matrix-size-row { display:grid; grid-template-columns:minmax(75px,1fr) minmax(90px,1fr) minmax(0,110px) auto; align-items:end; gap:12px; padding:10px 12px; background:#f5f9ff; border:1px solid #e0ecfa; border-radius:10px; }
+.matrix-current-stock { font-size:12px; color:#4c6585; align-self:center; }
+#inventory-matrix-page .matrix-remove-size { height:42px; min-width:42px; padding:0 10px; }
+.matrix-footer { text-align:left; }
+.matrix-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-top:14px; }
+#inventory-matrix-page button { cursor:pointer; }
+#inventory-matrix-page button:disabled { opacity:.6; cursor:wait; }
+#inventory-matrix-page .secondary-action { background:#eaf3ff; border:1px solid #b8d2f2; color:#1b5aaf; border-radius:8px; padding:9px 14px; }
+#inventory-matrix-page #matrix-save { background:#1764c7; color:white; border:0; border-radius:8px; padding:12px 18px; }
+#inventory-matrix-page .hidden { display:none!important; }
+@media (max-width:700px) { .matrix-fields { grid-template-columns:1fr; } .matrix-section,.matrix-colour-card,.matrix-footer {padding:14px;} .matrix-heading-bar {flex-direction:column;} .matrix-size-row {grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;} .matrix-current-stock {grid-column:1 / -1; order:1;} .matrix-tag-entry {flex-wrap:wrap;} }
+@media (max-width:390px) { .matrix-actions {flex-direction:column; align-items:stretch;} .matrix-size-row {gap:6px; padding:8px;} }

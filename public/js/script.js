@@ -263,12 +263,19 @@ function displayProducts(products) {
         const price = document.createElement("p");
         price.textContent = `Unit Price: ₹${product.price}`;
 
+        const brand = document.createElement("p");
+        brand.textContent = `Brand: ${product.brand || "Not Set"}`;
+
+        const tags = document.createElement("p");
+        tags.textContent = Array.isArray(product.tags) && product.tags.length
+            ? `Tags: ${product.tags.join(", ")}` : "";
+
         const stock = document.createElement("p");
         stock.textContent = totalStock > 0
             ? `Available Stock: ${totalStock}`
             : "Out of Stock";
 
-        info.append(artNumber, mrp, price, stock);
+        info.append(artNumber, brand, tags, mrp, price, stock);
         card.append(productImage, info);
 
         card.addEventListener("click", () => {
@@ -290,7 +297,8 @@ function showProductDetails(product){
     //shows product  info
     productDetails.classList.remove("hidden");
     document.getElementById("details-art-number").textContent=`Art No:${product.art_number}`;
-    document.getElementById("details-price").textContent=`MRP: ₹${product.mrp ?? "Not Set"} | Unit Price: ₹${product.price}`;
+    document.getElementById("details-price").textContent=
+        `Brand: ${product.brand || "Not Set"} | MRP: ₹${product.mrp ?? "Not Set"} | Unit Price: ₹${product.price}`;
     const colourButtons=document.getElementById("colour-buttons");
     colourButtons.innerHTML="";
 
@@ -351,17 +359,6 @@ document.getElementById("back-button").addEventListener("click",()=>{
     productsContainer.classList.remove("hidden");
 });
 
-const backToProductsButton = document.getElementById("back-to-products");
-
-backToProductsButton.addEventListener("click", () => {
-    hideAllMainSections();
-    pageHead.classList.remove("hidden");
-    productsContainer.classList.remove("hidden");
-    
-    updateActiveNav(productButton);
-});
-
-
 //search bar functionality
 const searchInput=document.getElementById("product-search");
 searchInput.addEventListener("input",()=>{
@@ -373,268 +370,24 @@ searchInput.addEventListener("input",()=>{
     displayProducts(filteredProducts);
 });
 
-//Functions of Add Product
-const addStockButton=document.getElementById("add-stock-button");
-const addStockForm=document.getElementById("add-stock-form");
-const productsContainer=document.getElementById("products-container");
-const productDetails=document.getElementById("product-details");
+// Inventory matrix actions are handled in inventory-matrix.js.
+const addStockButton = document.getElementById("add-stock-button");
+const addNewProductButton = document.getElementById("add-new-product-button");
+const addNewVariantButton = document.getElementById("add-new-variant-button");
+const productsContainer = document.getElementById("products-container");
+const productDetails = document.getElementById("product-details");
 const pageHead = document.getElementById("page-head");
 const dashboardButton = document.getElementById("dashboard-button");
 const productButton = document.getElementById("product-button");
 const dashboardPage = document.getElementById("dashboard-page");
-
-addStockButton.addEventListener("click", () => {
-    hideAllMainSections();
-    addStockForm.classList.remove("hidden");
-    updateActiveNav(productButton);
-});
-
-
-
-
-const stockForm = document.getElementById("stock-form");
-
-const validateStockArt = addInlineValidation(
-    document.getElementById("stock-art-number"),
-    requiredText
-);
-
-const validateStockColour = addInlineValidation(
-    document.getElementById("stock-colour"),
-    requiredText
-);
-
-const validateStockSize = addInlineValidation(
-    document.getElementById("stock-size"),
-    value => positiveWholeNumber(value, "Size")
-);
-
-const validateStockQuantity = addInlineValidation(
-    document.getElementById("stock-quantity"),
-    value => positiveWholeNumber(value, "Quantity")
-);
-
-function validateStockForm() {
-    return [
-        validateStockArt(),
-        validateStockColour(),
-        validateStockSize(),
-        validateStockQuantity()
-    ].every(Boolean);
-}
-
-stockForm.addEventListener("submit", handleAddStock);
-
-
-const addNewProductButton=document.getElementById("add-new-product-button");
-const addNewProductForm=document.getElementById("add-new-product-form");
-
+const inventoryMatrixPage = document.getElementById("inventory-matrix-page");
 
 function returnToProductsPage() {
+    hideAllMainSections();
     pageHead.classList.remove("hidden");
     productsContainer.classList.remove("hidden");
-
-    addStockForm.classList.add("hidden");
-    addNewProductForm.classList.add("hidden");
-    addNewVariantForm.classList.add("hidden");
-    productDetails.classList.add("hidden");
-}
-
-
-// Add New Colour Variant
-const addNewVariantButton = document.getElementById("add-new-variant-button");
-const addNewVariantForm = document.getElementById("add-new-variant-form");
-
-addNewVariantButton.addEventListener("click", () => {
-    hideAllMainSections();
-    addNewVariantForm.classList.remove("hidden");
     updateActiveNav(productButton);
-});
-addNewProductButton.addEventListener("click", () => {
-    hideAllMainSections();
-    addNewProductForm.classList.remove("hidden");
-    updateActiveNav(productButton);
-});
-
-async function handleAddStock(event){
-    event.preventDefault();
-
-    const artNumber=document.getElementById("stock-art-number").value.trim();
-    const colour=document.getElementById("stock-colour").value;
-    const size=document.getElementById("stock-size").value;
-    const quantity=document.getElementById("stock-quantity").value;
-
-    if(!validateStockForm()){
-        return;
-    }
-    try {
-        const response=await fetch("/api/stock",{
-            method:"POST",
-            headers:{
-                "Content-Type":"application/json"
-            },
-            body: JSON.stringify({
-                art_number:artNumber,
-                colour:colour,
-                size:Number(size),
-                quantity:Number(quantity)
-            })
-        });
-        const result=await response.json();
-        if(!response.ok)
-        {
-            throw new Error(result.error||"Failed To Add Stock");
-        }
-        const refreshed = await refreshProducts();
-        HawaUI.toast(refreshed ? "Stock added successfully." : "Stock saved, but the product display could not refresh.", refreshed ? "success" : "warning");
-        loadDashboard();
-        stockForm.reset();
-        clearInlineValidation(stockForm);
-        returnToProductsPage();
-        
-        
-    }catch(error){
-        console.error("Error:ADDING STOCK",error)
-
-        HawaUI.alert(error.message, { title: "Unable to add stock" });
-    }
 }
-
-const newProductForm=document.getElementById("new-product-form");
-const newImage = document.getElementById("new-image");
-const imagePreview = document.getElementById("image-preview");
-const cancelNewProduct = document.getElementById("cancel-new-product");
-
-const validateNewArt = addInlineValidation(
-    document.getElementById("new-art-number"),
-    requiredText
-);
-
-const validateNewColour = addInlineValidation(
-    document.getElementById("new-colour"),
-    requiredText
-);
-
-const validateNewMrp = addInlineValidation(
-    document.getElementById("new-mrp"),
-    value => positiveDecimal(value, "MRP")
-);
-
-const validateNewPrice = addInlineValidation(
-    document.getElementById("new-price"),
-    value => positiveDecimal(value, "Unit Price")
-);
-
-const validateNewSize = addInlineValidation(
-    document.getElementById("new-size"),
-    value => positiveWholeNumber(value, "Size")
-);
-
-const validateNewQuantity = addInlineValidation(
-    document.getElementById("new-quantity"),
-    value => positiveWholeNumber(value, "Quantity")
-);
-
-const validateNewImage = addInlineValidation(
-    newImage,
-    () => validateImageFile(newImage.files[0])
-);
-
-function validateNewProductForm() {
-    return [
-        validateNewArt(),
-        validateNewColour(),
-        validateNewMrp(),
-        validateNewPrice(),
-        validateNewSize(),
-        validateNewQuantity(),
-        validateNewImage()
-    ].every(Boolean);
-}
-
-newImage.addEventListener("change", () => {
-        const file = newImage.files[0];
-        if(file) {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                imagePreview.src = event.target.result;
-                imagePreview.classList.remove("hidden");
-            };
-            reader.readAsDataURL(file);
-        }
-        validateNewImage();
-    });
-
-cancelNewProduct.addEventListener("click", () => {
-    newProductForm.reset();
-
-    imagePreview.src = "";
-    imagePreview.classList.add("hidden");
-
-    clearInlineValidation(newProductForm);
-
-    returnToProductsPage();
-});
-
-newProductForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    const artNumber = document.getElementById("new-art-number").value.trim();
-    const colour = document.getElementById("new-colour").value.trim();
-    const mrp = document.getElementById("new-mrp").value;
-    const price = document.getElementById("new-price").value;
-    const size = document.getElementById("new-size").value;
-    const quantity = document.getElementById("new-quantity").value;
-    const image = document.getElementById("new-image").files[0];
-   
-    if(!validateNewProductForm()) {
-        return;
-    }
-
-    try{
-        const formData = new FormData();
-
-        formData.append("art_number", artNumber);
-        formData.append("colour", colour);
-        formData.append("mrp", mrp);
-        formData.append("price", price);
-        formData.append("size", size);
-        formData.append("quantity", quantity);
-        formData.append("image", image);
-
-        const response = await fetch("/api/products", {
-            method: "POST",
-            body: formData
-        });
-        
-        const responseText = await response.text();
-        console.log("Status:", response.status);
-        console.log("Response:", responseText);
-
-        const result = JSON.parse(responseText);
-
-        if(!response.ok){
-            throw new Error(result.error || "Failed To Add Prodct!!");
-        }
-
-        HawaUI.toast("Product added successfully.");
-
-        newProductForm.reset();
-        clearInlineValidation(newProductForm);
-
-        imagePreview.src = "";
-        imagePreview.classList.add("hidden");
-
-        await refreshProducts();
-
-        loadDashboard();
-
-        returnToProductsPage();
-    }catch(error) {
-        console.error("Error!! Adding Products:",error);
-        HawaUI.alert(error.message, { title: "Unable to add product" });
-    }
-}); 
 
 // Hide all main content sections
 function hideAllMainSections() {
@@ -642,9 +395,7 @@ function hideAllMainSections() {
     pageHead.classList.add("hidden");
     productsContainer.classList.add("hidden");
     productDetails.classList.add("hidden");
-    addStockForm.classList.add("hidden");
-    addNewProductForm.classList.add("hidden");
-    addNewVariantForm.classList.add("hidden");
+    inventoryMatrixPage.classList.add("hidden");
     document.getElementById("orders-page").classList.add("hidden");
     document.getElementById("add-order-form").classList.add("hidden");
     document.getElementById("order-details-page").classList.add("hidden");
@@ -677,137 +428,6 @@ productButton.addEventListener("click", async () => {
 
     updateActiveNav(productButton);
     await refreshProducts();
-});
-
-
-// Add New Colour Variant functionality
-
-const newVariantForm = document.getElementById("new-variant-form");
-const variantImage = document.getElementById("variant-image");
-const variantImagePreview = document.getElementById("variant-image-preview");
-const cancelNewVariant = document.getElementById("cancel-new-variant");
-
-
-
-const validateVariantArt = addInlineValidation(
-    document.getElementById("variant-art-number"),
-    requiredText
-);
-
-const validateVariantColour = addInlineValidation(
-    document.getElementById("variant-colour"),
-    requiredText
-);
-
-const validateVariantSize = addInlineValidation(
-    document.getElementById("variant-size"),
-    value => positiveWholeNumber(value, "Size")
-);
-
-const validateVariantQuantity = addInlineValidation(
-    document.getElementById("variant-quantity"),
-    value => positiveWholeNumber(value, "Quantity")
-);
-
-const validateVariantImage = addInlineValidation(
-    variantImage,
-    () => validateImageFile(variantImage.files[0])
-);
-
-function validateNewVariantForm() {
-    return [
-        validateVariantArt(),
-        validateVariantColour(),
-        validateVariantSize(),
-        validateVariantQuantity(),
-        validateVariantImage()
-    ].every(Boolean);
-}
-
-
-
-variantImage.addEventListener("change", () => {
-    const file = variantImage.files[0];
-
-    if (file) {
-        const reader = new FileReader();
-
-        reader.onload = (event) => {
-            variantImagePreview.src = event.target.result;
-            variantImagePreview.classList.remove("hidden");
-        };
-
-        reader.readAsDataURL(file);
-    }
-
-    validateVariantImage();
-});
-
-
-cancelNewVariant.addEventListener("click", () => {
-    newVariantForm.reset();
-    clearInlineValidation(newVariantForm);
-
-    variantImagePreview.src = "";
-    variantImagePreview.classList.add("hidden");
-
-    returnToProductsPage();
-});
-
-
-newVariantForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    const artNumber = document.getElementById("variant-art-number").value.trim();
-    const colour = document.getElementById("variant-colour").value.trim();
-    const size = document.getElementById("variant-size").value;
-    const quantity = document.getElementById("variant-quantity").value;
-    const image = variantImage.files[0];
-
-    if (!validateNewVariantForm()) {
-        return;
-    }
-
-    try {
-        const formData = new FormData();
-
-        formData.append("colour", colour);
-        formData.append("size", size);
-        formData.append("quantity", quantity);
-        formData.append("image", image);
-
-        const response = await fetch(
-            `/api/products/${encodeURIComponent(artNumber)}/variants`,
-            {
-                method: "POST",
-                body: formData
-            }
-        );
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.error || "Failed to add colour.");
-        }
-
-        HawaUI.toast("New colour added successfully.");
-
-        newVariantForm.reset();
-        clearInlineValidation(newVariantForm);
-        variantImagePreview.src = "";
-        variantImagePreview.classList.add("hidden");
-
-
-        await refreshProducts();
-
-        loadDashboard();
-
-        returnToProductsPage();
-
-    } catch (error) {
-        console.error("Add colour error:", error);
-        HawaUI.alert(error.message, { title: "Unable to add colour" });
-    }
 });
 
 

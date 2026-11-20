@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/css/orders.css">
     <link rel="stylesheet" href="/css/hawa-ui.css">
     <link rel="stylesheet" href="/css/admin-polish.css">
+    <link rel="stylesheet" href="/css/inventory-matrix.css">
 </head>
 
 <body>
@@ -142,190 +143,53 @@
                 </table>
             </div>
 
-            <!--Adding Stock-->
-            <div id="add-stock-form" class="hidden">
-                <h2>Add Stock</h2>
-
-                <button type="button" id="back-to-products" class="secondary-action form-back-button">← Back to Products</button>
-                <form id="stock-form" novalidate>
-
-                    <label for="stock-art-number">Art Number</label>
-                    <input 
-                    type="text"
-                    id="stock-art-number"
-                    placeholder="Enter Art Number"
-                    autocomplete="off"
-                    required
-                    >
-                    
-                    <label for="stock-colour">Colour</label>
-                        <input
-                            type="text"
-                            id="stock-colour"
-                            placeholder="Enter Colour"
-                            required
-                        >
-                    
-
-                    <label for="stock-size">Size</label>
-
-                    <input 
-                        type="number" 
-                        id="stock-size" 
-                        min="1" 
-                        placeholder="Enter Size"
-                        required>
-                    
-
-                    <label for="stock-quantity">Quantity</label>
-                    <input 
-                        type="number" 
-                        id="stock-quantity" 
-                        min="1" 
-                        placeholder="Enter Quantity"
-                        required>
-                   
-                    
-                    <button type = "submit">Add Stock</button>
-
+            <!-- All inventory actions share one size/colour matrix. -->
+            <section id="inventory-matrix-page" class="hidden" aria-labelledby="matrix-heading">
+                <div class="page-header matrix-heading-bar">
+                    <div>
+                        <h2 id="matrix-heading">Inventory Matrix</h2>
+                        <p id="matrix-intro" class="matrix-muted">Add any sizes you need; no preset size list.</p>
+                    </div>
+                    <button type="button" id="matrix-back" class="secondary-action">← Back to Products</button>
+                </div>
+                <form id="matrix-form" novalidate>
+                    <div class="matrix-section">
+                        <div class="matrix-fields">
+                            <label for="matrix-art">Art Number
+                                <input id="matrix-art" type="text" maxlength="80" list="matrix-art-options" autocomplete="off" placeholder="Enter art number" required>
+                                <datalist id="matrix-art-options"></datalist>
+                            </label>
+                            <label class="matrix-product-only" for="matrix-brand">Brand / Company
+                                <input id="matrix-brand" maxlength="100" placeholder="e.g. Local / Unbranded">
+                            </label>
+                            <label class="matrix-product-only" for="matrix-price">Shop selling price (₹)
+                                <input id="matrix-price" type="number" min="0.01" step="0.01" placeholder="599">
+                            </label>
+                            <label class="matrix-product-only" for="matrix-mrp">MRP (₹)
+                                <input id="matrix-mrp" type="number" min="0.01" step="0.01" placeholder="999">
+                            </label>
+                        </div>
+                        <div class="matrix-product-only matrix-tag-area">
+                            <label for="matrix-tag-input">Tags (optional)</label>
+                            <div class="matrix-tag-entry">
+                                <input id="matrix-tag-input" placeholder="Men, Sports, Shoes…" autocomplete="off">
+                                <button type="button" id="matrix-add-tag" class="secondary-action">+ Add Tag</button>
+                            </div>
+                            <div id="matrix-tags" class="matrix-tags" aria-live="polite"></div>
+                            <p class="matrix-muted">Press Enter or Add Tag to save each tag. Paste comma-separated tags if preferred.</p>
+                        </div>
+                    </div>
+                    <div id="matrix-colours" class="matrix-colours"></div>
+                    <div class="matrix-footer">
+                        <button type="button" id="matrix-add-colour" class="secondary-action">+ Add Another Colour</button>
+                        <p class="matrix-muted">Each colour has its own photo and size quantities. Add as many size rows as needed.</p>
+                        <div class="matrix-actions">
+                            <button type="button" id="matrix-cancel" class="secondary-action">Cancel</button>
+                            <button type="submit" id="matrix-save">Save Inventory</button>
+                        </div>
+                    </div>
                 </form>
-            </div>
-            
-            
-            <!--New Product Catalouge-->
-            <div id="add-new-product-form" class="hidden">
-                <h2>ADD NEW PRODUCT</h2>
-                <form id="new-product-form" novalidate>
-                    <label for="new-art-number">Art Number</label>
-                    <input
-                        type="text"
-                        id="new-art-number"
-                        placeholder="Enter Art Number"
-                        required
-                    >
-                    <label for="new-colour">Colour</label>
-                    <input
-                        type="text"
-                        id="new-colour"
-                        placeholder="Enter Colour"
-                        required
-                    >
-                    <label for = "new-mrp">MRP (retail Price)</label>
-                    <input
-                        type = "number"
-                        id = "new-mrp"
-                        min = "0.01"
-                        step = "0.01"
-                        placeholder = "Enter MRP"
-                        required
-                    >
-
-                    <label for="new-price">Unit Price (selling price to shop)</label>
-                    <input
-                        type="number"
-                        id="new-price"
-                        min="0.01"
-                        step = "0.01"
-                        placeholder="Enter Unit Price"
-                        required
-                    >
-                    <label for="new-size">Size</label>
-                    <input
-                        type="number"
-                        id="new-size"
-                        min="1"
-                        placeholder="Enter Size"
-                        required
-                    >
-                    <label for="new-quantity">Quantity</label>
-                    <input
-                        type="number"
-                        id="new-quantity"
-                        min = "1"
-                        step = "1"
-                        placeholder="Enter No.of Quantity"
-                        required
-                    >
-                    <label for="new-image">Product Image</label>
-                    <input
-                        type="file"
-                        id="new-image"
-                        accept="image/jpeg,image/png,image/webp"
-                        required
-                    >
-                    <img
-                        id="image-preview"
-                        class="image-preview hidden"
-                        alt="Selected product image"
-                    >
-                    <button type="submit">Add Product</button>
-                    <button type="button" id="cancel-new-product">Cancel</button>
-                </form>
-
-            </div>
-
-
-            <!-- Add New Colour Variant -->
-            <div id = "add-new-variant-form" class = "hidden">
-                <h2>ADD NEW COLOUR VARIANT</h2>
-
-                <form id = "new-variant-form" novalidate>
-
-                    <label for = "variant-art-number">Art Number</label>
-                    <input
-                        type = "text"
-                        id = "variant-art-number"
-                        placeholder = "Enter Existing Art Number"
-                        required
-                    >
-
-                    <label for = "variant-colour">New Colour</label>
-                    <input
-                        type = "text"
-                        id = "variant-colour"
-                        placeholder = "Enter New Colour"
-                        required
-                    >
-
-                    <label for = "variant-size">Size</label>
-                    <input
-                        type = "number"
-                        id = "variant-size"
-                        min = "1"
-                        placeholder = "Enter Size"
-                        required
-                    >
-
-                    <label for = "variant-quantity">Initial Quantity</label>
-                    <input
-                        type = "number"
-                        id = "variant-quantity"
-                        min = "1"
-                        step = "1"
-                        placeholder = "Enter Quantity"
-                        required
-                    >
-
-                    <label for = "variant-image">Product Image</label>
-                    <input
-                        type = "file"
-                        id = "variant-image"
-                        accept = "image/jpeg,image/png,image/webp"
-                        required
-                    >
-
-                    <img
-                        id = "variant-image-preview"
-                        class = "image-preview hidden"
-                        alt = "New colour image preview"
-                    >
-
-                    <button type = "submit">Add Colour</button>
-                    <button type = "button" id = "cancel-new-variant">Cancel</button>
-
-                </form>
-            </div>
-
+            </section>
 
             <!--ORDER-PAGE LAYOUt-->
             <div id="orders-page" class="hidden">
@@ -425,6 +289,7 @@
     <script src = "/js/hawa-ui.js"></script>
     <script src = "/js/auth.js"></script>
     <script src = "/js/script.js"></script>
+    <script src = "/js/inventory-matrix.js"></script>
     <script src = "/js/orders.js"></script>
 
 </body>

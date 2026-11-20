@@ -50,7 +50,8 @@
         const list = byId("customer-products");
         list.replaceChildren();
         const search = byId("customer-search").value.trim().toLowerCase();
-        const products = state.products.filter(p => String(p.art_number).toLowerCase().includes(search));
+        const products = state.products.filter(p => [String(p.art_number), p.brand || '', ...(p.tags || [])]
+            .some(value => value.toLowerCase().includes(search)));
         if (!products.length) {
             list.appendChild(node("p", "empty-state", "No products found."));
             return;
@@ -76,6 +77,9 @@
             const header = node("div", "product-card-header");
             header.append(node("h3", "", `Art No: ${product.art_number}`), node("span", "price", money(product.price)));
             body.append(header);
+            if (product.brand) body.append(node("p", "muted", `Brand: ${product.brand}`));
+            if (Array.isArray(product.tags) && product.tags.length)
+                body.append(node("p", "muted", `Tags: ${product.tags.join(', ')}`));
             const variantField = node("div", "field");
             const variantLabel = node("label", "", "Colour");
             const variants = node("select");

@@ -626,20 +626,21 @@ app.get("/api/customer/products", async (req, res) => {
     try {
         // Sizes may be shown, but NEVER include current quantities in response.
         const result = await pool.query(`
-            SELECT p.art_number, p.price, p.mrp,
+            SELECT p.art_number, p.price, p.mrp, p.brand,
+                   ARRAY(SELECT pt.tag FROM product_tags pt WHERE pt.art_number=p.art_number ORDER BY pt.tag) AS tags,
                    pv.colour, pv.image,
                    COALESCE(array_agg(DISTINCT s.size ORDER BY s.size)
                             FILTER (WHERE s.size IS NOT NULL), ARRAY[]::integer[]) AS sizes
             FROM products p
             JOIN product_variant pv ON pv.art_number = p.art_number
             LEFT JOIN stock s ON s.variant_id = pv.id
-            GROUP BY p.art_number, p.price, p.mrp, pv.id, pv.colour, pv.image
+            GROUP BY p.art_number, p.price, p.mrp, p.brand, pv.id, pv.colour, pv.image
             ORDER BY p.art_number, pv.colour
         `);
         const catalog = new Map();
         for (const row of result.rows) {
             if (!catalog.has(row.art_number)) catalog.set(row.art_number, {
-                art_number: row.art_number, price: row.price, mrp: row.mrp, variants: []
+                art_number: row.art_number, price: row.price, mrp: row.mrp, brand: row.brand, tags: row.tags, variants: []
             });
             catalog.get(row.art_number).variants.push({
                 colour: row.colour, image: row.image, sizes: row.sizes
@@ -775,6 +776,165 @@ app.post("/api/customer/orders", async (req, res) => {
 app.use("/api", requireAdmin);
 
 
+// Additive bulk inventory workflow. Existing single-size API endpoints stay available.
+// Admin-only: this route is intentionally declared AFTER app.use('/api', requireAdmin).
+const bulkInventoryUpload = (req, res, next) => {
+    upload.array('images', 12)(req, res, async error => {
+        if (error) {
+            for (const file of req.files || []) deleteUploadedImage(file);
+            return res.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE'
+                ? 'Each image must be smaller than 5 MB.' : error.message });
+        }
+        try {
+            for (const file of req.files || []) {
+                const extension = await detectImageExtension(file.path);
+                if (!extension) {
+                    for (const item of req.files) deleteUploadedImage(item);
+                    return res.status(400).json({ error: 'Only genuine JPG, PNG or WEBP images are accepted.' });
+                }
+                const newPath = `${file.path}.${extension}`;
+                await fs.promises.rename(file.path, newPath);
+                file.path = newPath;
+                file.filename = path.basename(newPath);
+            }
+            next();
+        } catch (e) {
+            for (const file of req.files || []) deleteUploadedImage(file);
+            console.error('Bulk image validation error:', e);
+            res.status(500).json({ error: 'Unable to check uploaded images.' });
+        }
+    });
+};
+
+function bulkInputError(message, status = 400) {
+    const e = new Error(message);
+    e.statusCode = status;
+    throw e;
+}
+function validBulkSizes(value, mode, colour) {
+    if (!Array.isArray(value) || value.length < 1 || value.length > 25)
+        bulkInputError(`${colour}: add between 1 and 25 sizes.`);
+    const used = new Set();
+    return value.map(row => {
+        const size = Number(row?.size);
+        const qty = Number(row?.quantity);
+        if (!Number.isSafeInteger(size) || size < 1 || size > 999)
+            bulkInputError(`${colour}: size must be a whole number between 1 and 999.`);
+        if (!Number.isSafeInteger(qty) || qty < (mode === 'stock' ? 1 : 0) || qty > 1000000)
+            bulkInputError(`${colour}, size ${size}: ${mode === 'stock' ? 'additional quantity must be at least 1' : 'quantity must be 0 or higher'}.`);
+        if (used.has(size)) bulkInputError(`${colour}: size ${size} is duplicated.`);
+        used.add(size);
+        return { size, quantity: qty };
+    });
+}
+
+app.post('/api/inventory/bulk', bulkInventoryUpload, async (req, res) => {
+    let client;
+    const files = req.files || [];
+    try {
+        let body;
+        try { body = JSON.parse(req.body?.data || ''); }
+        catch { bulkInputError('Invalid inventory form data.'); }
+        const mode = body?.mode;
+        if (!['product', 'colour', 'stock'].includes(mode)) bulkInputError('Invalid inventory action.');
+        const art = String(body.art_number || '').trim();
+        if (!art || art.length > 80) bulkInputError('Art number is required (maximum 80 characters).');
+        if (!Array.isArray(body.variants) || body.variants.length < 1 || body.variants.length > 12)
+            bulkInputError('Add between 1 and 12 colour cards.');
+        const usedColours = new Set();
+        const variants = body.variants.map(v => {
+            const colour = String(v?.colour || '').trim();
+            const key = colour.toLocaleLowerCase('en');
+            if (!colour || colour.length > 60) bulkInputError('Each colour must be 1–60 characters.');
+            if (usedColours.has(key)) bulkInputError(`Duplicate colour: ${colour}.`);
+            usedColours.add(key);
+            return { colour, sizes: validBulkSizes(v.sizes, mode, colour) };
+        });
+        if (mode === 'product') {
+            if (!Number.isFinite(Number(body.price)) || Number(body.price) <= 0 ||
+                !Number.isFinite(Number(body.mrp)) || Number(body.mrp) <= 0)
+                bulkInputError('Price and MRP must be positive numbers.');
+        }
+        const brand = String(body.brand || '').trim();
+        if (brand.length > 100) bulkInputError('Brand / company must be 100 characters or fewer.');
+        if (mode === 'product' && !brand) bulkInputError('Enter the brand / company (or Local / Unbranded).');
+        if (!Array.isArray(body.tags || []) || (body.tags || []).length > 20)
+            bulkInputError('Use at most 20 tags.');
+        const tags = (body.tags || []).map(t => String(t).trim()).filter(Boolean);
+        if (tags.some(t => t.length > 40) || new Set(tags.map(t => t.toLowerCase())).size !== tags.length)
+            bulkInputError('Tags must be unique and at most 40 characters.');
+        const hasPositiveStock = variants.some(v => v.sizes.some(s => s.quantity > 0));
+        if (mode !== 'stock' && !hasPositiveStock) bulkInputError('Enter stock for at least one size.');
+        if (mode === 'stock' && files.length) bulkInputError('Stock updates do not need new images.');
+        if (mode !== 'stock') {
+            if (files.length !== variants.length) bulkInputError('Provide one image for every new colour.');
+            if (files.some(f => f.fieldname !== 'images')) bulkInputError('Unexpected image field.');
+        }
+
+        client = await pool.connect();
+        await client.query('BEGIN');
+        if (mode === 'product') {
+            await client.query(
+                'INSERT INTO products (art_number, price, mrp, brand) VALUES ($1,$2,$3,$4)',
+                [art, Number(body.price), Number(body.mrp), brand]);
+            for (const tag of tags) {
+                await client.query('INSERT INTO product_tags (art_number, tag) VALUES ($1,$2)', [art, tag]);
+            }
+        } else {
+            const existing = await client.query('SELECT art_number FROM products WHERE art_number=$1 FOR UPDATE', [art]);
+            if (!existing.rows.length) bulkInputError(`Art number ${art} does not exist.`, 404);
+        }
+        for (const [index, variant] of variants.entries()) {
+            let variantId;
+            if (mode === 'stock') {
+                const match = await client.query(
+                    'SELECT id FROM product_variant WHERE art_number=$1 AND lower(btrim(colour))=lower(btrim($2::text))',
+                    [art, variant.colour]);
+                if (match.rows.length !== 1) bulkInputError(
+                    `Art ${art}, colour ${variant.colour}: expected one existing colour.`, 409);
+                variantId = match.rows[0].id;
+            } else {
+                const added = await client.query(
+                    'INSERT INTO product_variant (art_number, colour, image) VALUES ($1,$2,$3) RETURNING id',
+                    [art, variant.colour, files[index].filename]);
+                variantId = added.rows[0].id;
+            }
+            for (const item of variant.sizes) {
+                if (mode === 'stock') {
+                    await client.query(
+                        `INSERT INTO stock (variant_id,size,quantity) VALUES ($1,$2,$3)
+                         ON CONFLICT (variant_id,size)
+                         DO UPDATE SET quantity=stock.quantity+EXCLUDED.quantity`,
+                        [variantId, item.size, item.quantity]);
+                } else {
+                    await client.query(
+                        'INSERT INTO stock (variant_id,size,quantity) VALUES ($1,$2,$3)',
+                        [variantId, item.size, item.quantity]);
+                }
+            }
+        }
+        await client.query('COMMIT');
+        return res.status(mode === 'stock' ? 200 : 201).json({
+            message: mode === 'product' ? 'Product and all colours saved.'
+                : mode === 'colour' ? 'New colours and sizes saved.' : 'Stock updated for all selected sizes.'
+        });
+    } catch (error) {
+        await rollbackQuietly(client);
+        // Do not keep uploaded images when the database transaction fails.
+        if (error.code === '23505') error = Object.assign(new Error('This art number, colour or tag already exists.'), { statusCode: 409 });
+        if (!error.statusCode) console.error('Bulk inventory error:', error);
+        return res.status(error.statusCode || 500).json({ error: error.statusCode
+            ? error.message : 'Unable to save inventory. No stock was changed.' });
+    } finally {
+        if (client) client.release();
+        if (!res.statusCode || res.statusCode >= 400) {
+            // Async cleanup for failed submissions. No database image references were committed.
+            for (const file of files) deleteUploadedImage(file);
+        }
+    }
+});
+
+
 app.get("/api/products", async (req, res) => {
     try {
         const result = await pool.query(`
@@ -782,6 +942,8 @@ app.get("/api/products", async (req, res) => {
                 p.art_number,
                 p.price,
                 p.mrp,
+                p.brand,
+                ARRAY(SELECT pt.tag FROM product_tags pt WHERE pt.art_number=p.art_number ORDER BY pt.tag) AS tags,
                 pv.colour,
                 pv.image,
                 s.size,
@@ -802,6 +964,8 @@ app.get("/api/products", async (req, res) => {
                     art_number: row.art_number,
                     price: row.price,
                     mrp: row.mrp,
+                    brand: row.brand,
+                    tags: row.tags,
                     variants: Object.create(null)
                 };
             }

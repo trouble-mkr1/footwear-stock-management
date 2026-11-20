@@ -158,3 +158,22 @@ Use `pg_dump` to create **private** backups and `pg_restore` to test them in a s
 ```
 
 A successful listing is not a complete recovery test; actually restore into an isolated, disposable database and validate table counts and a sample read. The website remains **development-only** until client-approved phone verification, password recovery, security and deployment testing are completed.
+
+## Inventory matrix + brands/tags (Milestone 7.1)
+
+This version replaces the three single-size admin forms with **one reusable matrix**. Product creation accepts brand/company, optional tags, multiple colours (each with a different photo), and user-added numeric sizes. Add Colour adds one or more new colours and their sizes. Add Stock accepts multiple sizes for existing colours in a single save; input quantities **increase** current stock rather than replacing it. The existing single-row API endpoints remain for backward compatibility, but the main admin page now uses `POST /api/inventory/bulk`.
+
+Run `database/migrations/003_inventory_matrix_brand_tags.sql` against the **isolated test database first**, after confirming `SELECT current_database()`. It only adds `products.brand` and a `product_tags` table/index and does not alter orders or existing stock. Back up the development database before applying the same migration there. Both admin and customer catalogues can show brand and tags, but the customer API still does **not** return stock quantities.
+
+Do not test stock edits on `footwear_inventory_new` until migration and manual testing pass on `footwear_inventory_test`. The bulk endpoint validates duplicate sizes/colours and commits all changes in a single PostgreSQL transaction. Each image is validated by its file signature; failed transactions remove uploaded images. The image storage provider is not changed by this milestone.
+
+Check from project root:
+
+```powershell
+npm test
+$env:RUN_DB_TESTS='YES_I_WANT_TO_TEST'
+npm run test:integration
+Remove-Item Env:RUN_DB_TESTS
+```
+
+The integration tests need `TEST_DB_NAME=footwear_inventory_test` in the local `.env`, both database migrations `002` and `003` already applied to that test database, and a working PostgreSQL instance. They use a temporary test image directory and remove their own fixtures. Review `INSTALL_MILESTONE7_MATRIX.md` for detailed steps and manual verification.

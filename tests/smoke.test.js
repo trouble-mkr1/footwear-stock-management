@@ -41,9 +41,9 @@ for (const file of ["public/index.html", "public/billing.html", "public/login.ht
     });
 }
 
-test("Order forms have exactly one opening and closing form tag", () => {
+test("Inventory and order forms have exactly one opening and closing form tag", () => {
     const html = read("public/index.html");
-    for (const id of ["stock-form", "new-product-form", "new-variant-form", "order-form"]) {
+    for (const id of ["matrix-form", "order-form"]) {
         assert.equal([...html.matchAll(new RegExp(`<form\\b[^>]*\\bid\\s*=\\s*["']${id}["']`, "g"))].length, 1,
             `Expected one form with ID ${id}`);
     }

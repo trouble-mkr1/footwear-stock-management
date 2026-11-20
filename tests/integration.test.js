@@ -7,6 +7,8 @@ const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const net = require("node:net");
 const path = require("node:path");
+const fs = require("node:fs");
+const os = require("node:os");
 const { spawn } = require("node:child_process");
 
 require("dotenv").config({ path: path.join(__dirname, "../.env") });
@@ -63,6 +65,8 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
     let child;
     const suffix = crypto.randomBytes(5).toString("hex");
     const art = `TEST_${suffix}`;
+    const matrixArt = `TESTM_${suffix}`;
+    const tempImageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hawa-inventory-test-'));
     const company = `Automated fixture ${suffix}`;
     let variantId;
     let cookie;
@@ -133,7 +137,7 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
                 ADMIN_USERNAME: adminUser,
                 ADMIN_PASSWORD_HASH: hash,
                 SESSION_SECRET: crypto.randomBytes(32).toString("hex"),
-                NODE_ENV: "test", PORT: String(port)
+                NODE_ENV: "test", PORT: String(port), IMAGE_UPLOAD_DIR: tempImageDir
             },
             stdio: ["ignore", "pipe", "pipe"]
         });
@@ -164,6 +168,62 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             assert.ok(cookie?.startsWith("footwear.sid="), "Session cookie not returned");
             assert.equal((await api("GET", "/api/auth/session")).body.authenticated, true);
         });
+        async function bulk(mode, data, numberOfImages = 0) {
+            const form = new FormData();
+            form.append('data', JSON.stringify({ mode, ...data }));
+            const jpg = fs.readFileSync(path.join(root, 'public/images/Blue-1001.jpg'));
+            for (let n = 0; n < numberOfImages; n++) {
+                form.append('images', new Blob([jpg], { type:'image/jpeg' }), `test-${n}.jpg`);
+            }
+            const response = await fetch(base + '/api/inventory/bulk', {
+                method:'POST', headers: {Cookie:cookie}, body:form
+            });
+            return {status:response.status, body:await response.json()};
+        }
+        await t.test('Bulk inventory rejects duplicates and rolls back without leaving uploads', async () => {
+            const bad = await bulk('product', {
+                art_number:matrixArt,brand:'Test Brand',price:499,mrp:799,tags:['Men'],
+                variants:[{colour:'Black',sizes:[{size:8,quantity:10},{size:8,quantity:2}]}]
+            }, 1);
+            assert.equal(bad.status, 400, JSON.stringify(bad.body));
+            assert.equal((await pool.query('SELECT * FROM products WHERE art_number=$1',[matrixArt])).rowCount,0);
+            // Image unlink is asynchronous; allow it to complete before asserting.
+            for (let n=0; n<25 && fs.readdirSync(tempImageDir).length; n++)
+                await new Promise(resolve => setTimeout(resolve,20));
+            assert.equal(fs.readdirSync(tempImageDir).length,0);
+        });
+        await t.test('Bulk new product persists multi-colour sizes, brand and tags', async () => {
+            const result = await bulk('product', {
+                art_number:matrixArt,brand:'Test Brand',price:499,mrp:799,tags:['Men','Sports'],
+                variants:[
+                    {colour:'Black',sizes:[{size:6,quantity:10},{size:9,quantity:5}]},
+                    {colour:'Brown',sizes:[{size:8,quantity:3}]}
+                ]
+            }, 2);
+            assert.equal(result.status,201,JSON.stringify(result.body));
+            const admin = await api('GET','/api/products');
+            const found=admin.body.find(p=>p.art_number===matrixArt);
+            assert.equal(found.brand,'Test Brand');
+            assert.deepEqual(found.tags,['Men','Sports']);
+            assert.equal(found.variants.length,2);
+            assert.equal(found.variants.find(v=>v.colour==='Black').stock.length,2);
+        });
+        await t.test('Bulk stock increments sizes and a new colour can be added', async () => {
+            const stock = await bulk('stock',{
+                art_number:matrixArt,variants:[{colour:'Black',sizes:[{size:6,quantity:2},{size:7,quantity:9}]}]
+            });
+            assert.equal(stock.status,200,JSON.stringify(stock.body));
+            const colour = await bulk('colour', {
+                art_number:matrixArt,variants:[{colour:'Green',sizes:[{size:8,quantity:4}]}]
+            },1);
+            assert.equal(colour.status,201,JSON.stringify(colour.body));
+            const rows=await pool.query(`SELECT pv.colour,s.size,s.quantity FROM stock s
+                JOIN product_variant pv ON pv.id=s.variant_id WHERE pv.art_number=$1`,[matrixArt]);
+            assert.equal(Number(rows.rows.find(r=>r.colour==='Black' && r.size===6).quantity),12);
+            assert.equal(Number(rows.rows.find(r=>r.colour==='Black' && r.size===7).quantity),9);
+            assert.equal(Number(rows.rows.find(r=>r.colour==='Green' && r.size===8).quantity),4);
+        });
+
         await t.test("Invalid and over-stock order requests do not change stock", async () => {
             assert.equal((await api("POST", "/api/orders", {
                 company_name: company, address: "test", items: []
@@ -348,6 +408,11 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
                     await pool.query("DELETE FROM customers WHERE id=$1", [row.id]);
                 }
             }
+            // Bulk matrix fixture and its tags/images are separate from the order fixture.
+            await pool.query('DELETE FROM stock WHERE variant_id IN (SELECT id FROM product_variant WHERE art_number=$1)',[matrixArt]);
+            await pool.query('DELETE FROM product_variant WHERE art_number=$1',[matrixArt]);
+            await pool.query('DELETE FROM product_tags WHERE art_number=$1',[matrixArt]);
+            await pool.query('DELETE FROM products WHERE art_number=$1',[matrixArt]);
             if (variantId !== undefined) {
                 await pool.query("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE company_name=$1)", [company]);
                 await pool.query("DELETE FROM orders WHERE company_name=$1", [company]);
@@ -361,5 +426,6 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             console.error("Test fixture cleanup failed:", cleanupError);
         }
         await pool.end();
+        fs.rmSync(tempImageDir,{recursive:true,force:true});
     }
 });
