@@ -371,14 +371,89 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             const r = await customerApi("POST", "/api/customer/orders", {items: item(999)});
             assert.equal(r.status, 409, JSON.stringify(r.body));
             assert.match(r.body.error, /Not enough stock/);
+            assert.equal(r.body.code, "INSUFFICIENT_STOCK");
+            assert.deepEqual(r.body.item, { art_number: art, colour: "Blue", size: 8 });
+            assert.equal(JSON.stringify(r.body).includes('available_quantity'), false);
             assert.equal(await currentQty(), before);
             const partial = await customerApi("POST", "/api/customer/orders", {
                 items: [...item(1), ...item(999)]
             });
             assert.equal(partial.status, 409);
+            assert.equal(partial.body.code, "INSUFFICIENT_STOCK");
+            assert.deepEqual(partial.body.item, { art_number: art, colour: "Blue", size: 8 });
             assert.equal(await currentQty(), before);
         });
+        await t.test("All unavailable cart lines are returned together, without stock counts or deductions", async () => {
+            const before = await currentQty();
+            const secondBefore = await pool.query(`SELECT s.quantity FROM stock s
+                JOIN product_variant pv ON pv.id=s.variant_id
+                WHERE pv.art_number=$1 AND pv.colour='Black' AND s.size=6`, [matrixArt]);
+            const r = await customerApi("POST", "/api/customer/orders", {
+                items: [
+                    { art_number: art, colour: "Blue", size: 8, quantity: 999 },
+                    { art_number: matrixArt, colour: "Black", size: 6, quantity: 999 },
+                    { art_number: matrixArt, colour: "Black", size: 9, quantity: 1 }
+                ]
+            });
+            assert.equal(r.status, 409, JSON.stringify(r.body));
+            assert.equal(r.body.code, "MULTIPLE_ITEMS_UNAVAILABLE");
+            assert.equal(r.body.issues.length, 2);
+            assert.deepEqual(r.body.issues.map(issue => issue.item.art_number).sort(), [art, matrixArt].sort());
+            assert.ok(r.body.issues.every(issue => issue.code === "INSUFFICIENT_STOCK"));
+            assert.equal(JSON.stringify(r.body).includes('available_quantity'), false);
+            assert.equal(JSON.stringify(r.body).includes('remaining_quantity'), false);
+            assert.equal(await currentQty(), before);
+            const secondAfter = await pool.query(`SELECT s.quantity FROM stock s
+                JOIN product_variant pv ON pv.id=s.variant_id
+                WHERE pv.art_number=$1 AND pv.colour='Black' AND s.size=6`, [matrixArt]);
+            assert.equal(secondAfter.rows[0].quantity, secondBefore.rows[0].quantity);
+        });
+        await t.test("Repeated same item is checked by its combined quantity", async () => {
+            const before = await currentQty();
+            const r = await customerApi("POST", "/api/customer/orders", {
+                items: [...item(11), ...item(11)]
+            });
+            assert.equal(r.status, 409, JSON.stringify(r.body));
+            assert.equal(r.body.issues.length, 1);
+            assert.equal(await currentQty(), before);
+        });
+        await t.test("Only admin may download a PDF generated from saved order prices", async () => {
+            const quantityBefore = await currentQty();
+            const result = await api("POST", "/api/orders", {
+                company_name: company, address: "Test Street", items: item(1)
+            });
+            assert.equal(result.status, 201, JSON.stringify(result.body));
+            const invoiceId = result.body.order_id;
+            assert.equal(await currentQty(), quantityBefore - 1,
+                "Creating the invoice's order should deduct one pair");
+            // Check the saved order-item price, not the product's original seed price.
+            // An earlier edit test intentionally changes the current product price to 600.
+            const snapshot = await pool.query(
+                "SELECT unit_price FROM order_items WHERE order_id=$1 ORDER BY id LIMIT 1",
+                [invoiceId]
+            );
+            assert.equal(snapshot.rows.length, 1);
+            const savedUnitPrice = Number(snapshot.rows[0].unit_price).toLocaleString("en-IN", {
+                minimumFractionDigits: 2, maximumFractionDigits: 2
+            });
+            const forbidden = await fetch(`${base}/api/billing/orders/${invoiceId}/pdf`, {
+                headers: {Cookie: customerCookie}
+            });
+            assert.equal(forbidden.status, 401);
+            const response = await fetch(`${base}/api/billing/orders/${invoiceId}/pdf`, {
+                headers: {Cookie: cookie}
+            });
+            assert.equal(response.status, 200);
+            assert.match(response.headers.get("content-type"), /application\/pdf/);
+            assert.equal(response.headers.get("cache-control"), "private, no-store");
+            const pdf = Buffer.from(await response.arrayBuffer());
+            assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
+            assert.ok(pdf.includes(Buffer.from(`Invoice / Order No.: #${invoiceId}`)));
+            assert.ok(pdf.includes(Buffer.from(savedUnitPrice)),
+                `PDF should include the saved unit price Rs. ${savedUnitPrice}`);
+        });
         await t.test("Customer order uses account identity and is not editable by customer", async () => {
+            const quantityBefore = await currentQty();
             const r = await customerApi("POST", "/api/customer/orders", {
                 company_name: "Spoofed shop", address: "Spoofed address", items: item(3)
             });
@@ -387,7 +462,7 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             assert.equal(data.rows[0].customer_id, customerId);
             assert.equal(data.rows[0].company_name, shopName);
             assert.equal(data.rows[0].address, "Test customer address");
-            assert.equal(await currentQty(), 15);
+            assert.equal(await currentQty(), quantityBefore - 3);
             const listing = await customerApi("GET", "/api/customer/orders");
             assert.equal(listing.status, 200);
             assert.equal(listing.body.find(o => o.id === r.body.order_id).status, "Yet to Receive");
@@ -418,10 +493,11 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             assert.equal((await api("PUT", `/api/orders/${id}/complete`)).status, 200);
             const delivered = await customerApi("GET", "/api/customer/orders");
             assert.equal(delivered.body.find(o => o.id === id).status, "Received");
+            const quantityBeforeReorder = await currentQty();
             const reorder = await customerApi("POST", "/api/customer/orders", {items: item(2)});
             assert.equal(reorder.status, 201, JSON.stringify(reorder.body));
             assert.notEqual(reorder.body.order_id, id);
-            assert.equal(await currentQty(), 13);
+            assert.equal(await currentQty(), quantityBeforeReorder - 2);
         });
     } catch (err) {
         err.message += `\nTest server output:\n${output}`;

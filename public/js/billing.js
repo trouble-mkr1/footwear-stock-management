@@ -2,6 +2,9 @@ const orderSelect = document.getElementById("billing-order-select");
 const invoiceContainer = document.getElementById("invoice-container");
 const message = document.getElementById("billing-message");
 const printButton = document.getElementById("print-invoice");
+const shareButton = document.getElementById("share-invoice-pdf");
+let preparedPdf = null;
+let preparedOrderId = null;
 
 let billingOrders = [];
 
@@ -46,6 +49,9 @@ orderSelect.addEventListener("change", async () => {
 
     invoiceContainer.innerHTML = "";
     printButton.disabled = true;
+    shareButton.disabled = true;
+    preparedPdf = null;
+    preparedOrderId = null;
 
     if (!orderId) {
         message.textContent = "Select an order to prepare its invoice.";
@@ -65,10 +71,34 @@ orderSelect.addEventListener("change", async () => {
         }
 
         const order = await response.json();
+        if (orderSelect.value !== orderId) return;
         renderInvoice(order);
-        message.textContent = "";
+        message.textContent = "Preparing PDF for sharing...";
         printButton.disabled = false;
 
+        // Fetch before the Share tap, preserving browser user activation when
+        // navigator.share() is invoked on a mobile phone.
+        try {
+            const pdfResponse = await fetch(`/api/billing/orders/${encodeURIComponent(orderId)}/pdf`, {cache: "no-store"});
+            if (!pdfResponse.ok) {
+                const data = await pdfResponse.json().catch(() => ({}));
+                throw new Error(data.error || "Unable to generate invoice PDF.");
+            }
+            const pdfBlob = await pdfResponse.blob();
+            if (pdfBlob.type !== "application/pdf" || pdfBlob.size < 100) {
+                throw new Error("The server did not return a valid PDF.");
+            }
+            if (orderSelect.value !== orderId) return; // user changed selection
+            preparedPdf = new File([pdfBlob], `HAWA-Invoice-${orderId}.pdf`, {type: "application/pdf"});
+            preparedOrderId = orderId;
+            shareButton.disabled = false;
+            message.textContent = "Invoice ready for printing or sharing.";
+        } catch (pdfError) {
+            if (orderSelect.value === orderId) {
+                console.error("PDF preparation failed:", pdfError);
+                message.textContent = `Invoice ready for printing, but PDF is unavailable: ${pdfError.message}`;
+            }
+        }
     } catch (error) {
         console.error("error loading order details:", error);
         message.textContent = error.message || "Unable to load this orders details.";
@@ -169,6 +199,39 @@ function escapeHTML(value) {
 
 printButton.addEventListener("click", () => {
     window.print();
+});
+
+function downloadPreparedPdf(file) {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+shareButton.addEventListener("click", async () => {
+    const file = preparedPdf;
+    if (!file || preparedOrderId !== orderSelect.value) return;
+    // The native file-share call happens immediately during this click.
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        try {
+            await navigator.share({ title: `HAWA TRADERS Invoice #${preparedOrderId}`, files: [file] });
+            return;
+        } catch (error) {
+            if (error.name === "AbortError") return; // user closed share sheet
+            console.warn("Native PDF sharing unavailable:", error);
+        }
+    }
+    // Desktop and unsupported browsers: download the same PDF; Print still works.
+    downloadPreparedPdf(file);
+    if (window.HawaUI?.toast) {
+        HawaUI.toast("PDF downloaded. You can attach it in any app.", "warning");
+    } else {
+        message.textContent = "PDF downloaded. You can attach it in any app.";
+    }
 });
 
 loadBillingData();

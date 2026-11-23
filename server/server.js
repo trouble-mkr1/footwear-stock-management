@@ -5,6 +5,7 @@ const pool = require("./db");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { buildInvoicePdf } = require("./invoice-pdf");
 
 const session = require("express-session");
 const PgSession = require("connect-pg-simple")(session);
@@ -694,11 +695,12 @@ app.get("/api/customer/orders", async (req, res) => {
 app.post("/api/customer/orders", async (req, res) => {
     let client;
     try {
-        // Customer identity and shop/address are always taken from the database.
+        // A cart may contain up to 30 lines. Never trust the browser's stock checks.
         const items = validateOrderItems(req.body?.items);
         if (items.length > 30 || items.some(item => item.quantity > 1000)) {
             return res.status(400).json({ error: "Please limit each order to 30 items and 1,000 pairs per item." });
         }
+
         client = await pool.connect();
         await client.query("BEGIN");
         const customerResult = await client.query(
@@ -715,13 +717,15 @@ app.post("/api/customer/orders", async (req, res) => {
             error.statusCode = 409;
             throw error;
         }
-        const header = await client.query(
-            `INSERT INTO orders (company_name, address, customer_id)
-             VALUES ($1,$2,$3) RETURNING id`,
-            [customer.shop_name, customer.address, req.session.customerId]
-        );
-        const orderId = header.rows[0].id;
+
+        // Resolve ALL lines before changing stock; never stop at the first short item.
+        // Multiple lines for the same variant/size must be checked by their SUM,
+        // otherwise a specially crafted request could bypass the availability check.
+        const problems = [];
+        const grouped = new Map();
+        const resolved = [];
         for (const item of items) {
+            const identity = { art_number: item.artNumber, colour: item.colour, size: item.size };
             const variantResult = await client.query(
                 `SELECT pv.id, p.price, p.mrp FROM product_variant pv
                  JOIN products p ON p.art_number=pv.art_number
@@ -730,27 +734,72 @@ app.post("/api/customer/orders", async (req, res) => {
                 [item.artNumber, item.colour]
             );
             if (variantResult.rows.length !== 1) {
-                const error = new Error("Selected product is no longer available. Please update your order.");
-                error.statusCode = 409;
-                throw error;
+                problems.push({ code: "ITEM_UNAVAILABLE", item: identity,
+                    message: `Art ${item.artNumber}, ${item.colour}, size ${item.size} is no longer available. Please remove or change this item.` });
+                continue;
             }
             const variant = variantResult.rows[0];
             if (!Number.isFinite(Number(variant.price)) || Number(variant.price) <= 0) {
-                const error = new Error("This product cannot be ordered right now.");
-                error.statusCode = 409;
-                throw error;
+                problems.push({ code: "ITEM_UNAVAILABLE", item: identity,
+                    message: `Art ${item.artNumber}, ${item.colour}, size ${item.size} cannot be ordered right now.` });
+                continue;
             }
+            resolved.push({ item, variant });
+            const key = `${variant.id}:${item.size}`;
+            if (grouped.has(key)) {
+                grouped.get(key).required += item.quantity;
+            } else {
+                grouped.set(key, { variantId: variant.id, size: item.size,
+                    required: item.quantity, identity });
+            }
+        }
+
+        // Lock stock rows in a stable order to prevent double-selling during concurrent
+        // checkouts (and reduce deadlock risk for multi-item orders).
+        const requirements = [...grouped.values()].sort((a, b) =>
+            Number(a.variantId) - Number(b.variantId) || a.size - b.size);
+        for (const requirement of requirements) {
             const stock = await client.query(
+                `SELECT quantity FROM stock WHERE variant_id=$1 AND size=$2 FOR UPDATE`,
+                [requirement.variantId, requirement.size]
+            );
+            if (!stock.rows.length || Number(stock.rows[0].quantity) < requirement.required) {
+                const { art_number, colour, size } = requirement.identity;
+                problems.push({ code: "INSUFFICIENT_STOCK", item: requirement.identity,
+                    message: `Not enough stock for Art ${art_number}, ${colour}, size ${size}. Please reduce this item's quantity and try again.` });
+            }
+        }
+
+        if (problems.length) {
+            const error = new Error(problems.length === 1
+                ? problems[0].message
+                : `${problems.length} items need attention. Review the highlighted items and try again.`);
+            error.statusCode = 409;
+            error.issues = problems;
+            throw error;
+        }
+
+        // Only now create the order and deduct stock; a failure rolls EVERYTHING back.
+        const header = await client.query(
+            `INSERT INTO orders (company_name, address, customer_id)
+             VALUES ($1,$2,$3) RETURNING id`,
+            [customer.shop_name, customer.address, req.session.customerId]
+        );
+        const orderId = header.rows[0].id;
+        for (const requirement of requirements) {
+            const update = await client.query(
                 `UPDATE stock SET quantity=quantity-$1
                  WHERE variant_id=$2 AND size=$3 AND quantity >= $1
                  RETURNING variant_id`,
-                [item.quantity, variant.id, item.size]
+                [requirement.required, requirement.variantId, requirement.size]
             );
-            if (!stock.rows.length) {
-                const error = new Error("Not enough stock available. Please reduce the order quantity and try again.");
+            if (!update.rows.length) {
+                const error = new Error("Stock changed during checkout. Please retry your order.");
                 error.statusCode = 409;
                 throw error;
             }
+        }
+        for (const { item, variant } of resolved) {
             await client.query(
                 `INSERT INTO order_items
                  (order_id,art_number,colour,size,quantity,unit_price,mrp)
@@ -763,9 +812,16 @@ app.post("/api/customer/orders", async (req, res) => {
     } catch (error) {
         await rollbackQuietly(client);
         if (!error.statusCode) console.error("Customer order error:", error);
-        return res.status(error.statusCode || 500).json({
+        const response = {
             error: error.statusCode ? error.message : "Unable to place your order. Please try again."
-        });
+        };
+        if (error.statusCode === 409 && Array.isArray(error.issues) && error.issues.length) {
+            // Backward-compatible single-item fields; never return availability counts.
+            response.issues = error.issues;
+            response.code = error.issues.length === 1 ? error.issues[0].code : "MULTIPLE_ITEMS_UNAVAILABLE";
+            response.item = error.issues[0].item;
+        }
+        return res.status(error.statusCode || 500).json(response);
     } finally {
         if (client) client.release();
     }
@@ -2023,6 +2079,38 @@ app.get("/api/orders/:id", async (req, res) => {
         res.status(500).json({
             error: "Failed To Load Order Details"
         });
+    }
+});
+
+
+// Admin-only PDF download for the native Share PDF action.
+// All invoice values are loaded from server-side order snapshots, never client HTML.
+app.get("/api/billing/orders/:id/pdf", async (req, res) => {
+    const orderId = Number(req.params.id);
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) {
+        return res.status(400).json({ error: "Invalid order ID." });
+    }
+    try {
+        const result = await pool.query(
+            `SELECT id, company_name, address, status FROM orders WHERE id=$1`, [orderId]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: "Order not found." });
+        const items = await pool.query(
+            `SELECT art_number, colour, size, quantity, unit_price, mrp
+             FROM order_items WHERE order_id=$1 ORDER BY id`, [orderId]
+        );
+        const pdf = buildInvoicePdf({ ...result.rows[0], items: items.rows });
+        res.set("Content-Type", "application/pdf");
+        res.set("Content-Disposition", `attachment; filename="HAWA-Invoice-${orderId}.pdf"`);
+        res.set("Cache-Control", "private, no-store");
+        res.set("X-Content-Type-Options", "nosniff");
+        return res.status(200).send(pdf);
+    } catch (error) {
+        if (error.statusCode === 409) {
+            return res.status(409).json({ error: error.message });
+        }
+        console.error("Invoice PDF generation failed:", error);
+        return res.status(500).json({ error: "Unable to generate this invoice PDF." });
     }
 });
 

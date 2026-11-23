@@ -34,14 +34,27 @@
         <div><h2 id="customer-products-title">Products</h2><p class="muted">Choose a colour, size and quantity to order.</p></div>
         <span class="cart-chip" id="cart-count" aria-live="polite">0 items</span>
       </div>
-      <label for="customer-search" class="sr-only">Search by art number</label>
-      <input type="search" id="customer-search" class="product-search" placeholder="Search by art number...">
-      <div id="customer-products" class="customer-product-grid" aria-live="polite"><p class="muted">Loading products...</p></div>
-      <section class="cart-panel" id="customer-cart-panel" aria-labelledby="cart-title">
-        <div class="section-heading"><div><h2 id="cart-title">Your Order</h2><p class="muted">Review items before placing an order.</p></div></div>
-        <div id="customer-cart" aria-live="polite"><p class="muted">Your order is empty.</p></div>
-        <div class="cart-bottom"><strong id="cart-total">Estimated total: ₹0.00</strong><button class="primary-btn" id="place-order-button" type="button" disabled>Place Order</button></div>
-      </section>
+      <div class="customer-shopping-layout">
+        <div class="customer-catalogue">
+          <label for="customer-search" class="sr-only">Search by art number, brand or tag</label>
+          <input type="search" id="customer-search" class="product-search" placeholder="Search by art number, brand or tag...">
+          <div id="customer-products" class="customer-product-grid" aria-live="polite"><p class="muted">Loading products...</p></div>
+        </div>
+        <aside class="cart-panel" id="customer-cart-panel" aria-labelledby="cart-title" tabindex="-1">
+          <div class="section-heading cart-heading">
+            <div><h2 id="cart-title">Your Order</h2><p class="muted">Review quantities before placing an order.</p></div>
+            <button type="button" id="close-cart-button" class="cart-close-btn" aria-label="Close order cart">Close</button>
+          </div>
+          <div id="cart-stock-error" class="cart-stock-error hidden" role="alert" tabindex="-1"></div>
+          <div id="customer-cart" aria-live="polite"><p class="muted">Your order is empty.</p></div>
+          <div class="cart-bottom"><strong id="cart-total">Estimated total: ₹0.00</strong><button class="primary-btn" id="place-order-button" type="button" disabled>Place Order</button></div>
+        </aside>
+      </div>
+      <button type="button" id="customer-cart-backdrop" class="cart-backdrop" aria-label="Close order cart" hidden></button>
+      <button type="button" id="mobile-cart-toggle" class="mobile-cart-toggle" aria-controls="customer-cart-panel" aria-expanded="false">
+        <span id="mobile-cart-label">View Order (0)</span>
+        <strong id="mobile-cart-total">₹0.00</strong>
+      </button>
     </section>
     <section id="customer-orders-page" class="hidden" aria-labelledby="my-orders-title">
       <div class="section-heading"><div><h2 id="my-orders-title">My Orders</h2><p class="muted">Orders you've placed and their delivery status.</p></div><button type="button" id="refresh-orders" class="outline-btn">Refresh</button></div>
