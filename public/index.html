@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="/css/admin-polish.css">
     <link rel="stylesheet" href="/css/inventory-matrix.css">
     <link rel="stylesheet" href="/css/analytics.css">
+    <link rel="stylesheet" href="/css/product-edit.css">
 </head>
 
 <body>
@@ -114,7 +115,7 @@
       <article class="analytics-stat"><span class="analytics-stat-label">Delivered Orders</span><strong class="analytics-stat-value" id="analytics-delivered">—</strong></article>
       <article class="analytics-stat"><span class="analytics-stat-label">Pairs Delivered</span><strong class="analytics-stat-value" id="analytics-pairs">—</strong></article>
       <article class="analytics-stat"><span class="analytics-stat-label">Recorded Sales Value</span><strong class="analytics-stat-value" id="analytics-value">—</strong></article>
-      <article class="analytics-stat"><span class="analytics-stat-label">Historic Orders Without Delivery Date</span><strong class="analytics-stat-value" id="analytics-undated">—</strong></article>
+      <article class="analytics-stat"><span class="analytics-stat-label">Delivered Orders Missing Item Details</span><strong class="analytics-stat-value" id="analytics-missing-items">—</strong></article>
     </div>
     <p class="analytics-note" id="analytics-unpriced-note"></p>
     <div class="analytics-grid">
@@ -131,7 +132,7 @@
         <div class="analytics-table-wrap"><table class="analytics-table"><thead><tr><th>Shop</th><th>Top Article</th><th>Article Pairs</th><th>Shop Total Pairs</th></tr></thead><tbody id="analytics-shops"></tbody></table></div>
       </section>
       <section class="analytics-panel" style="grid-column:1/-1"><h3>Recent Deliveries — Last 8 Weeks</h3>
-        <p class="analytics-panel-description">Date-based chart includes only deliveries recorded after migration 004. Older undated completed orders remain in the all-time rankings above.</p>
+        <p class="analytics-panel-description">The trend uses recorded delivery dates. Older completed orders without dates remain in the overall order count and available all-time rankings, but not this chart.</p>
         <div id="analytics-trend" class="analytics-trend" aria-label="Delivered pairs by week"></div>
       </section>
     </div>
@@ -144,7 +145,7 @@
         <input type="search" id="product-search" placeholder="Search art number, brand, colour or tag..." aria-label="Search products by art number, brand, colour or tag">
     </div>
     <div class="product-toolbar-actions">
-        <button type="button" id="add-stock-button">+ Stock / New Colour</button>
+        <button type="button" id="add-stock-button">+ Add Stock</button>
         <button type="button" id="add-new-product-button">+ New Product</button>
     </div>
 </div>
@@ -164,6 +165,7 @@
 
                 <div class="details-heading-row">
                     <h2 id="details-art-number"></h2>
+                    <button type="button" id="edit-product-button" class="secondary-action">Edit Product Details</button>
                 </div>
                 <div id="details-price" class="details-facts" aria-label="Product details"></div>
                 <div id="details-tags" class="details-tags" aria-label="Product tags"></div>
@@ -184,6 +186,41 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Editing changes metadata only; art number and stock are unchanged. -->
+            <section id="edit-product-page" class="hidden" aria-labelledby="edit-product-heading">
+                <div class="page-header edit-product-heading">
+                    <h2 id="edit-product-heading">Edit Product Details</h2>
+                    <button type="button" id="edit-product-back" class="secondary-action">← Back</button>
+                </div>
+                <form id="edit-product-form" novalidate>
+                    <label>Art Number (cannot be changed)
+                        <input type="text" id="edit-product-art" readonly>
+                    </label>
+                    <label>Brand / Company
+                        <input type="text" id="edit-product-brand" maxlength="100" required>
+                    </label>
+                    <div class="edit-product-pricing">
+                        <label>Unit Price (₹)
+                            <input type="number" id="edit-product-price" min="0.01" step="0.01" required>
+                        </label>
+                        <label>MRP (₹)
+                            <input type="number" id="edit-product-mrp" min="0.01" step="0.01" required>
+                        </label>
+                    </div>
+                    <label for="edit-product-tag-input">Tags (optional)</label>
+                    <div class="edit-product-tag-entry">
+                        <input id="edit-product-tag-input" placeholder="Enter tags, separated by commas" autocomplete="off">
+                        <button type="button" id="edit-product-add-tag" class="secondary-action">+ Add Tag</button>
+                    </div>
+                    <div id="edit-product-tags" class="matrix-tags" aria-live="polite"></div>
+                    <p class="matrix-muted">Add up to 20 unique tags. Click × to remove a tag.</p>
+                    <div class="edit-product-actions">
+                        <button type="button" id="edit-product-cancel" class="secondary-action">Cancel</button>
+                        <button type="submit" id="edit-product-save">Save Changes</button>
+                    </div>
+                </form>
+            </section>
 
             <!-- All inventory actions share one size/colour matrix. -->
             <section id="inventory-matrix-page" class="hidden" aria-labelledby="matrix-heading">
@@ -291,10 +328,10 @@
                     <input type="text" class="order-art-number" placeholder="Enter Art Number" required>
                 </label>
                 <label>Colour
-                    <input type="text" class="order-colour" placeholder="Enter Colour" required>
+                    <select class="order-colour" required><option value="">Select art number first</option></select>
                 </label>
                 <label>Size
-                    <input type="number" class="order-size" min="1" step="1" placeholder="Enter Size" required>
+                    <select class="order-size" required><option value="">Select colour first</option></select>
                 </label>
                 <label>Quantity
                     <input type="number" class="order-quantity" min="1" step="1" placeholder="Enter Quantity" required>
@@ -332,6 +369,7 @@
     <script src = "/js/auth.js"></script>
     <script src = "/js/script.js"></script>
     <script src = "/js/inventory-matrix.js"></script>
+    <script src="/js/product-edit.js"></script>
     <script src = "/js/orders.js"></script>
     <script src="/js/analytics.js"></script>
 

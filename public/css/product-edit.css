@@ -1,0 +1,15 @@
+/* Product detail editor: no art-number, stock or photo mutations here. */
+#edit-product-page{max-width:800px;margin:auto}
+.edit-product-heading,.details-heading-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#edit-product-form{display:flex;flex-direction:column;gap:16px;background:white;border:1px solid #dce7f5;border-radius:14px;padding:24px;box-shadow:0 2px 8px rgba(15,23,42,.05)}
+#edit-product-form label{font-size:14px;color:#294568;font-weight:650;display:block}
+#edit-product-form input{width:100%;min-width:0;padding:11px 12px;margin-top:7px;min-height:44px;border-radius:8px;border:1px solid #bdcfe5;background:#fff;color:#18324f;font:inherit}
+#edit-product-form input[readonly]{background:#f1f5fa;color:#5f6f86}
+.edit-product-pricing{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.edit-product-tag-entry{display:flex;gap:8px;align-items:end}
+.edit-product-tag-entry input{flex:1}
+.edit-product-actions{display:flex;justify-content:flex-end;gap:12px}
+#edit-product-save{padding:11px 19px;border:0;background:#075cd3;color:white;border-radius:8px;font-weight:750;cursor:pointer}
+#edit-product-save:disabled{opacity:.65;cursor:wait}
+#edit-product-button{white-space:nowrap}
+@media(max-width:600px){#edit-product-form{padding:16px}.edit-product-pricing{grid-template-columns:1fr}.edit-product-tag-entry{flex-wrap:wrap}.edit-product-actions{flex-direction:column}}

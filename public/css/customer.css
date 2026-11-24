@@ -60,3 +60,8 @@
 
 /* Derived from delivered-order activity; never discloses shop counts or stock. */
 .customer-popular-badge{display:inline-block;align-self:flex-start;margin:3px 0 8px;padding:5px 10px;border-radius:999px;background:#e4f2ff;border:1px solid #acd4fa;color:#08468e;font-size:12px;font-weight:750}
+
+/* Client-requested sales labels: actual delivered sales only. */
+.customer-sales-badges{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 8px}
+.customer-sales-badges .customer-popular-badge{margin:0}
+.customer-trending-badge{background:#fff3dd;border-color:#f2cc88;color:#824d07}

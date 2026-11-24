@@ -29,21 +29,130 @@ function orderField(className, row) {
 }
 
 
+// Art number suggestions are prefix-filtered; colour/size options depend on art.
+// Uses the existing admin-only catalogue API, so no duplicate backend endpoint.
+let orderCatalogue = [];
+let orderRowSequence = 0;
+async function loadOrderCatalogue() {
+    const response = await fetch("/api/products", { cache: "no-store" });
+    if (!response.ok) throw new Error("Unable to load the product catalogue for order entry.");
+    const data = await response.json();
+    if (!Array.isArray(data)) throw new Error("Invalid product catalogue response.");
+    orderCatalogue = data;
+    // The form resets/recreates its rows after this fetch. The server-rendered
+    // initial row intentionally has no suggestion list and is replaced entirely.
+}
+function option(value, label = value) {
+    const el = document.createElement("option");
+    el.value = String(value);
+    el.textContent = String(label);
+    return el;
+}
+function findOrderProduct(art) {
+    return orderCatalogue.find(p => String(p.art_number).toLowerCase() === String(art).trim().toLowerCase());
+}
+function hideOrderArtSuggestions(row) {
+    row.querySelector(".order-art-suggestions").hidden = true;
+}
+function fillOrderArtOptions(row) {
+    const art = orderField("order-art-number",row);
+    const list = row.querySelector(".order-art-suggestions");
+    const query = art.value.trim().toLowerCase();
+    list.replaceChildren();
+    const matches = orderCatalogue.filter(p => String(p.art_number).toLowerCase().startsWith(query)).slice(0,30);
+    if (!matches.length) {
+        const empty = document.createElement("p");
+        empty.className = "order-art-suggestion-empty";
+        empty.textContent = "No matching art numbers";
+        list.appendChild(empty);
+    }
+    for (const product of matches) {
+        const choice = document.createElement("button");
+        choice.type = "button";
+        choice.className = "order-art-suggestion";
+        choice.setAttribute("role","option");
+        choice.textContent = String(product.art_number);
+        // Avoid submitting the surrounding order form when selecting an article.
+        choice.addEventListener("mousedown",event => event.preventDefault());
+        choice.addEventListener("click",() => {
+            art.value = String(product.art_number);
+            fillOrderColours(row);
+            hideOrderArtSuggestions(row);
+            art.focus({preventScroll:true});
+        });
+        list.appendChild(choice);
+    }
+}
+function fillOrderSizes(row, preferred = "") {
+    const sizes = orderField("order-size",row);
+    const colour = orderField("order-colour",row).value;
+    const product = findOrderProduct(orderField("order-art-number",row).value);
+    const variant = product?.variants?.find(v => v.colour === colour);
+    sizes.replaceChildren(option("", "Select size"));
+    for (const stock of variant?.stock || []) sizes.appendChild(option(stock.size));
+    if (preferred && [...sizes.options].some(op => op.value === String(preferred))) sizes.value = String(preferred);
+    sizes.disabled = !variant;
+}
+function fillOrderColours(row, preferredColour = "", preferredSize = "") {
+    const colours = orderField("order-colour",row);
+    const product = findOrderProduct(orderField("order-art-number",row).value);
+    colours.replaceChildren(option("", "Select colour"));
+    for (const variant of product?.variants || []) colours.appendChild(option(variant.colour));
+    if (preferredColour && [...colours.options].some(op => op.value.toLowerCase() === String(preferredColour).toLowerCase())) {
+        colours.value = [...colours.options].find(op => op.value.toLowerCase() === String(preferredColour).toLowerCase()).value;
+    }
+    colours.disabled = !product;
+    fillOrderSizes(row,preferredSize);
+}
 function createOrderItemRow(item = null) {
     const row = document.createElement("div");
     row.className = "order-item";
-    // Static markup only; order values are assigned through input.value below.
+    const id = `order-art-suggestions-${++orderRowSequence}`;
     row.innerHTML = `
         <div class="order-item-header">
             <strong class="order-item-title">Order Item</strong>
             <button type="button" class="remove-order-item secondary-action">Remove Item</button>
         </div>
-        <label>Art No<input type="text" class="order-art-number" placeholder="Enter Art Number" required></label>
-        <label>Colour<input type="text" class="order-colour" placeholder="Enter Colour" required></label>
-        <label>Size<input type="number" class="order-size" min="1" step="1" placeholder="Enter Size" required></label>
+        <div class="order-art-field">
+            <label for="${id}-input">Art No</label>
+            <input id="${id}-input" type="text" class="order-art-number" placeholder="Type art number (e.g. 1)..." autocomplete="off" aria-controls="${id}" aria-autocomplete="list" required>
+            <div class="order-art-suggestions" id="${id}" role="listbox" hidden></div>
+        </div>
+        <label>Colour<select class="order-colour" required><option value="">Select art number first</option></select></label>
+        <label>Size<select class="order-size" required><option value="">Select colour first</option></select></label>
         <label>Quantity<input type="number" class="order-quantity" min="1" step="1" placeholder="Enter Quantity" required></label>
     `;
-    if (item) populateOrderRow(row, item);
+    const artInput = orderField("order-art-number",row);
+    artInput.addEventListener("focus", () => {
+        fillOrderArtOptions(row);
+        row.querySelector(".order-art-suggestions").hidden = false;
+    });
+    artInput.addEventListener("input", () => {
+        fillOrderArtOptions(row);
+        row.querySelector(".order-art-suggestions").hidden = false;
+        fillOrderColours(row);
+    });
+    artInput.addEventListener("keydown", event => {
+        const suggestions = row.querySelector(".order-art-suggestions");
+        if (event.key === "Escape") hideOrderArtSuggestions(row);
+        if (event.key === "Enter" && !suggestions.hidden) {
+            const first = suggestions.querySelector(".order-art-suggestion");
+            if (first) { event.preventDefault(); first.click(); }
+        }
+        if (event.key === "ArrowDown" && !suggestions.hidden) {
+            const first = suggestions.querySelector(".order-art-suggestion");
+            if (first) { event.preventDefault(); first.focus(); }
+        }
+    });
+    row.addEventListener("focusout", () => {
+        setTimeout(() => {
+            if (!row.querySelector(".order-art-field").contains(document.activeElement)) hideOrderArtSuggestions(row);
+        },0);
+    });
+    orderField("order-colour",row).addEventListener("change",() => fillOrderSizes(row));
+    fillOrderArtOptions(row);
+    if (item) populateOrderRow(row,item);
+    else fillOrderColours(row);
     return row;
 }
 
@@ -57,8 +166,8 @@ function updateOrderItemRows() {
 
 function populateOrderRow(row, item) {
     orderField("order-art-number", row).value = item.art_number ?? "";
-    orderField("order-colour", row).value = item.colour ?? "";
-    orderField("order-size", row).value = item.size ?? "";
+    fillOrderArtOptions(row);
+    fillOrderColours(row, item.colour ?? "", item.size ?? "");
     orderField("order-quantity", row).value = item.quantity ?? "";
 }
 
@@ -283,6 +392,7 @@ async function editOrder(orderId) {
             throw new Error("This order has no items to edit.");
         }
 
+        await loadOrderCatalogue();
         resetOrderForm();
         document.getElementById("order-company-name").value = order.company_name || "";
         document.getElementById("order-address").value = order.address || "";
@@ -344,7 +454,9 @@ ordersButton.addEventListener("click", () => {
 orderSearch.addEventListener("input", displayOrders);
 orderStatusFilter.addEventListener("change", displayOrders);
 
-addOrderButton.addEventListener("click", () => {
+addOrderButton.addEventListener("click", async () => {
+    try { await loadOrderCatalogue(); }
+    catch (error) { HawaUI.alert(error.message); return; }
     resetOrderForm();
     hideAllMainSections();
     addOrderForm.classList.remove("hidden");
@@ -389,7 +501,7 @@ orderForm.addEventListener("submit", async event => {
     }));
 
     if (!companyName || !address || items.length === 0 || items.some(item =>
-        !item.art_number || !item.colour || !Number.isInteger(item.size) || item.size <= 0 ||
+        !findOrderProduct(item.art_number) || !item.colour || !Number.isInteger(item.size) || item.size <= 0 ||
         !Number.isInteger(item.quantity) || item.quantity <= 0
     )) {
         HawaUI.toast("Fill in company, address, and valid art number, colour, size and quantity for every item.", "warning");

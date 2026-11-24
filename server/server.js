@@ -651,11 +651,37 @@ app.get("/api/customer/products", async (req, res) => {
             ORDER BY SUM(oi.quantity) DESC, oi.art_number LIMIT 3
         `);
         const popularArts = new Set(popularResult.rows.map(row => row.art_number));
+        // All-time best sellers are based on delivered PAIRS, including old manual shop
+        // orders. Require at least two actual delivered orders before showing a badge.
+        const topSellerResult = await pool.query(`
+            SELECT oi.art_number
+            FROM orders o JOIN order_items oi ON oi.order_id=o.id
+            JOIN products p ON p.art_number=oi.art_number
+            WHERE LOWER(BTRIM(o.status))='completed'
+            GROUP BY oi.art_number
+            HAVING COUNT(DISTINCT o.id) >= 2
+            ORDER BY SUM(oi.quantity) DESC, oi.art_number LIMIT 3
+        `);
+        // Trending refers only to recent, reliably timestamped deliveries.
+        const trendingResult = await pool.query(`
+            SELECT oi.art_number
+            FROM orders o JOIN order_items oi ON oi.order_id=o.id
+            JOIN products p ON p.art_number=oi.art_number
+            WHERE LOWER(BTRIM(o.status))='completed'
+              AND o.completed_at >= NOW() - INTERVAL '30 days'
+            GROUP BY oi.art_number
+            HAVING COUNT(DISTINCT o.id) >= 2
+            ORDER BY SUM(oi.quantity) DESC, oi.art_number LIMIT 3
+        `);
+        const topSellerArts = new Set(topSellerResult.rows.map(row => row.art_number));
+        const trendingArts = new Set(trendingResult.rows.map(row => row.art_number));
         const catalog = new Map();
         for (const row of result.rows) {
             if (!catalog.has(row.art_number)) catalog.set(row.art_number, {
                 art_number: row.art_number, price: row.price, mrp: row.mrp, brand: row.brand,
-                tags: row.tags, popular: popularArts.has(row.art_number), variants: []
+                tags: row.tags, popular: popularArts.has(row.art_number),
+                top_seller: topSellerArts.has(row.art_number),
+                trending: trendingArts.has(row.art_number), variants: []
             });
             catalog.get(row.art_number).variants.push({
                 colour: row.colour, image: row.image, sizes: row.sizes
@@ -1026,6 +1052,51 @@ app.post('/api/inventory/bulk', bulkInventoryUpload, async (req, res) => {
     }
 });
 
+
+// Admin-only metadata editing. Art number is intentionally immutable.
+// Order item prices are historical snapshots and MUST NOT change here.
+app.put("/api/products/:artNumber/details", async (req, res) => {
+    let client;
+    try {
+        const art = String(req.params.artNumber || "").trim();
+        if (!art || art.length > 80) return res.status(400).json({ error: "Invalid art number." });
+        const body = req.body || {};
+        if (typeof body.brand !== "string" || !body.brand.trim() || body.brand.trim().length > 100)
+            return res.status(400).json({ error: "Brand / Company must be 1–100 characters." });
+        const price = Number(body.price), mrp = Number(body.mrp);
+        if (![price,mrp].every(n => Number.isFinite(n) && n > 0 && n <= 99999999.99 &&
+            Math.abs(Math.round(n * 100) - n * 100) < 1e-6))
+            return res.status(400).json({ error: "Unit price and MRP must be positive amounts with at most two decimal places." });
+        if (!Array.isArray(body.tags) || body.tags.length > 20 ||
+            body.tags.some(tag => typeof tag !== "string" || !tag.trim() || tag.trim().length > 40))
+            return res.status(400).json({ error: "Use up to 20 tags, each 1–40 characters." });
+        const tags = body.tags.map(tag => tag.trim());
+        const tagKeys = tags.map(tag => tag.toLowerCase());
+        if (new Set(tagKeys).size !== tags.length)
+            return res.status(400).json({ error: "Tags must be unique (case-insensitive)." });
+        client = await pool.connect();
+        await client.query("BEGIN");
+        const existing = await client.query("SELECT art_number FROM products WHERE art_number=$1 FOR UPDATE", [art]);
+        if (!existing.rows.length) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Product not found. Please refresh the catalogue." });
+        }
+        await client.query("UPDATE products SET brand=$1, price=$2, mrp=$3 WHERE art_number=$4",
+            [body.brand.trim(), price, mrp, art]);
+        await client.query("DELETE FROM product_tags WHERE art_number=$1", [art]);
+        for (const tag of tags) {
+            await client.query("INSERT INTO product_tags (art_number,tag) VALUES ($1,$2)", [art, tag]);
+        }
+        await client.query("COMMIT");
+        return res.json({ message: "Product details updated.", art_number: art });
+    } catch (error) {
+        await rollbackQuietly(client);
+        console.error("Edit product metadata error:", error);
+        return res.status(500).json({ error: "Unable to update product. No changes were saved." });
+    } finally {
+        if (client) client.release();
+    }
+});
 
 app.get("/api/products", async (req, res) => {
     try {

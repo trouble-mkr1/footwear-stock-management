@@ -301,6 +301,7 @@ function showProductDetails(product) {
     productsContainer.classList.add('hidden');
     productDetails.classList.remove('hidden');
     document.getElementById('details-art-number').textContent = `Art No: ${product.art_number}`;
+    document.getElementById('edit-product-button').dataset.artNumber = product.art_number;
     const priceBox = document.getElementById('details-price');
     priceBox.replaceChildren();
     for (const [label, value] of [
@@ -397,6 +398,7 @@ function returnToProductsPage() {
 function hideAllMainSections() {
     dashboardPage.classList.add("hidden");
     document.getElementById("analytics-page").classList.add("hidden");
+    document.getElementById("edit-product-page").classList.add("hidden");
     pageHead.classList.add("hidden");
     productsContainer.classList.add("hidden");
     productDetails.classList.add("hidden");

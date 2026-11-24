@@ -11,9 +11,13 @@ async function getSalesAnalytics(pool) {
                COALESCE(SUM(oi.quantity),0) AS pairs_delivered,
                COALESCE(SUM(oi.quantity * oi.unit_price) FILTER
                    (WHERE oi.unit_price IS NOT NULL AND oi.unit_price > 0),0) AS known_sales_value,
-               COUNT(*) FILTER (WHERE oi.unit_price IS NULL OR oi.unit_price <= 0) AS unpriced_lines,
+               COUNT(*) FILTER (WHERE oi.id IS NOT NULL AND
+                   (oi.unit_price IS NULL OR oi.unit_price <= 0)) AS unpriced_lines,
+               COUNT(DISTINCT o.id) FILTER (WHERE oi.id IS NULL) AS orders_without_items,
                COUNT(DISTINCT o.id) FILTER (WHERE o.completed_at IS NULL) AS undated_orders
-        ${ordersFromItems}
+        FROM orders o
+        LEFT JOIN order_items oi ON oi.order_id = o.id
+        WHERE ${delivered}
     `);
     const brands = await pool.query(`
         WITH grouped AS (
@@ -91,6 +95,7 @@ async function getSalesAnalytics(pool) {
             pairsDelivered: Number(s.pairs_delivered),
             knownSalesValue: Number(s.known_sales_value),
             unpricedLines: Number(s.unpriced_lines),
+            ordersWithoutItems: Number(s.orders_without_items),
             undatedOrders: Number(s.undated_orders)
         },
         brands: brands.rows.map(row => ({brand:row.brand,units:Number(row.units),orders:Number(row.orders),value:Number(row.value)})),

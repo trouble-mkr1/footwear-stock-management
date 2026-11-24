@@ -119,9 +119,11 @@
             }
             header.append(node("h3", "", `Art No: ${product.art_number}`), pricing);
             body.append(header);
-            if (product.popular === true) {
-                body.appendChild(node("span", "customer-popular-badge", "Popular with shops"));
-            }
+            const badges = node("div", "customer-sales-badges");
+            if (product.top_seller === true) badges.appendChild(node("span", "customer-popular-badge", "Top Seller"));
+            if (product.trending === true) badges.appendChild(node("span", "customer-popular-badge customer-trending-badge", "Trending · 30 days"));
+            if (product.popular === true) badges.appendChild(node("span", "customer-popular-badge", "Popular with shops"));
+            if (badges.childElementCount) body.appendChild(badges);
             if (product.brand) body.append(node("p", "muted", `Brand: ${product.brand}`));
             if (Array.isArray(product.tags) && product.tags.length) {
                 const chips = node('div', 'customer-tags');

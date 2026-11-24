@@ -215,3 +215,13 @@
 .details-stock-panel .stock-table { max-width:none; width:100%; }
 .details-stock-panel .stock-table-scroll { overflow-x:auto; }
 @media(max-width:760px){.details-facts{grid-template-columns:1fr;gap:8px;}.details-layout{grid-template-columns:1fr;}.details-visual .details-image{max-height:330px;}.admin-product-card .product-info{padding:14px;}}
+
+/* Accessible, prefix-filtered art-number suggestions for Admin Orders. */
+#order-items-container .order-art-field{position:relative;min-width:0}
+#order-items-container .order-art-field label{display:block;margin-bottom:7px}
+#order-items-container .order-art-field input{width:100%}
+#order-items-container .order-art-suggestions{position:absolute;top:100%;left:0;right:0;z-index:30;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #a8c6ed;border-radius:8px;box-shadow:0 8px 18px rgba(15,46,92,.18);padding:4px}
+#order-items-container .order-art-suggestions[hidden]{display:none!important}
+#order-items-container .order-art-suggestion{display:block;width:100%;text-align:left;background:#fff;color:#17416e;border:0;border-radius:5px;padding:11px 12px;font:inherit;cursor:pointer}
+#order-items-container .order-art-suggestion:hover,#order-items-container .order-art-suggestion:focus-visible{background:#e5f0ff;outline:2px solid #93bbeb;outline-offset:-2px}
+#order-items-container .order-art-suggestion-empty{font-size:13px;color:#61748c;margin:8px}

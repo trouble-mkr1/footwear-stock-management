@@ -77,10 +77,15 @@
             byId("analytics-delivered").textContent=integer(data.summary.deliveredOrders);
             byId("analytics-pairs").textContent=integer(data.summary.pairsDelivered);
             byId("analytics-value").textContent=money(data.summary.knownSalesValue);
-            byId("analytics-undated").textContent=integer(data.summary.undatedOrders);
-            byId("analytics-unpriced-note").textContent=data.summary.unpricedLines
-                ? `${integer(data.summary.unpricedLines)} historical item lines have no valid saved price and are excluded from the sales-value total.`
-                : "Sales value uses saved order prices; only delivered orders are included.";
+            byId("analytics-missing-items").textContent=integer(data.summary.ordersWithoutItems);
+            const notices = ["Delivered order count matches the Dashboard. Sales value uses saved order prices."];
+            if (data.summary.ordersWithoutItems) notices.push(
+                `${integer(data.summary.ordersWithoutItems)} delivered orders have no item details, so they contribute to order count but not pair, brand or revenue totals.`);
+            if (data.summary.undatedOrders) notices.push(
+                `${integer(data.summary.undatedOrders)} older delivered orders have no recorded delivery date. They count in all-time reports, but cannot appear in the weekly trend chart.`);
+            if (data.summary.unpricedLines) notices.push(
+                `${integer(data.summary.unpricedLines)} order item lines have no saved price and are excluded from the sales-value total.`);
+            byId("analytics-unpriced-note").textContent = notices.join(" ");
             ranking("analytics-brands",data.brands,"brand");
             ranking("analytics-articles",data.articles,"artNumber","brand");
             table("analytics-sizes",data.sizes,["size","units","orders"],{units:integer,orders:integer});

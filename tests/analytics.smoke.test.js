@@ -52,7 +52,7 @@ test("Analytics response converts numeric PostgreSQL results and is safe for emp
     const {getSalesAnalytics}=require("../server/analytics");
     let calls=0;
     const sample=[
-        {rows:[{delivered_orders:"2",pairs_delivered:"6",known_sales_value:"1998.50",unpriced_lines:"1",undated_orders:"1"}]},
+        {rows:[{delivered_orders:"2",pairs_delivered:"6",known_sales_value:"1998.50",unpriced_lines:"1",undated_orders:"1",orders_without_items:"1"}]},
         {rows:[{brand:"ABC",units:"6",orders:"2",value:"1998.50"}]},
         {rows:[{art_number:"1001",brand:"ABC",units:"6",orders:"2",value:"1998.50"}]},
         {rows:[{size:8,units:"6",orders:"2"}]},
@@ -63,6 +63,7 @@ test("Analytics response converts numeric PostgreSQL results and is safe for emp
     const result=await getSalesAnalytics(fakePool);
     assert.equal(calls,6);
     assert.equal(result.summary.deliveredOrders,2);
+    assert.equal(result.summary.ordersWithoutItems,1);
     assert.equal(result.summary.knownSalesValue,1998.5);
     assert.deepEqual(result.articles[0],{artNumber:"1001",brand:"ABC",units:6,orders:2,value:1998.5});
     assert.equal(result.shops[0].shopTotal,6);

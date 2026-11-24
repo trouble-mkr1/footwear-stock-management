@@ -523,6 +523,49 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             assert.notEqual(reorder.body.order_id, id);
             assert.equal(await currentQty(), quantityBeforeReorder - 2);
         });
+        await t.test("Analytics Delivered Orders matches Dashboard even when a Completed order has no saved items", async () => {
+            // A past data cleanup could leave a completed order without item lines.
+            // Keep the total accurate, but do not invent missing quantities.
+            const row = await pool.query(
+                "INSERT INTO orders (company_name, address, status) VALUES ($1,$2,'Completed') RETURNING id",
+                [company + " itemless", "Integration fixture"]);
+            const emptyOrderId = row.rows[0].id;
+            try {
+                const dashboard = await api("GET", "/api/dashboard");
+                const report = await api("GET", "/api/analytics");
+                assert.equal(dashboard.status, 200);
+                assert.equal(report.status, 200, JSON.stringify(report.body));
+                assert.equal(report.body.summary.deliveredOrders, dashboard.body.completedOrders);
+                assert.ok(report.body.summary.ordersWithoutItems >= 1);
+            } finally {
+                await pool.query("DELETE FROM orders WHERE id=$1",[emptyOrderId]);
+            }
+        });
+        await t.test("Admin can edit price, brand and tags without rewriting historical order prices", async () => {
+            const url = `/api/products/${encodeURIComponent(art)}/details`;
+            const savedBefore = await pool.query(
+                "SELECT id, unit_price, mrp FROM order_items WHERE art_number=$1 ORDER BY id",[art]);
+            assert.ok(savedBefore.rows.length >= 1);
+            const body = {brand:"Integration Brand",price:599.29,mrp:899.99,tags:["Men","Sneakers"]};
+            const forbidden = await customerApi("PUT", url, body);
+            assert.equal(forbidden.status,401);
+            const response = await api("PUT", url, body);
+            assert.equal(response.status,200,JSON.stringify(response.body));
+            const row = await pool.query("SELECT brand,price,mrp FROM products WHERE art_number=$1",[art]);
+            assert.equal(row.rows[0].brand,"Integration Brand");
+            assert.equal(Number(row.rows[0].price),599.29);
+            assert.equal(Number(row.rows[0].mrp),899.99);
+            const tags = await pool.query("SELECT tag FROM product_tags WHERE art_number=$1 ORDER BY tag",[art]);
+            assert.deepEqual(tags.rows.map(r=>r.tag),["Men","Sneakers"]);
+            const savedAfter = await pool.query(
+                "SELECT id, unit_price, mrp FROM order_items WHERE art_number=$1 ORDER BY id",[art]);
+            assert.deepEqual(savedAfter.rows,savedBefore.rows,"Historical order snapshots must remain unchanged");
+            const bad = await api("PUT",url,{...body,tags:["Sports","sports"]});
+            assert.equal(bad.status,400);
+            const unchanged = await pool.query("SELECT brand,price FROM products WHERE art_number=$1",[art]);
+            assert.equal(unchanged.rows[0].brand,"Integration Brand");
+            assert.equal(Number(unchanged.rows[0].price),599.29);
+        });
     } catch (err) {
         err.message += `\nTest server output:\n${output}`;
         throw err;
