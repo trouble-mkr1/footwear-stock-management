@@ -119,6 +119,9 @@
             }
             header.append(node("h3", "", `Art No: ${product.art_number}`), pricing);
             body.append(header);
+            if (product.popular === true) {
+                body.appendChild(node("span", "customer-popular-badge", "Popular with shops"));
+            }
             if (product.brand) body.append(node("p", "muted", `Brand: ${product.brand}`));
             if (Array.isArray(product.tags) && product.tags.length) {
                 const chips = node('div', 'customer-tags');

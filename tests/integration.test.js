@@ -150,6 +150,10 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             assert.equal(r.status, 200, JSON.stringify(r.body));
             assert.deepEqual(r.body, { status: "ok" });
         });
+        await t.test("Analytics API requires admin login", async () => {
+            const forbidden = await api("GET", "/api/analytics", undefined, false);
+            assert.equal(forbidden.status, 401);
+        });
         await t.test("Private API requires login", async () => {
             assert.equal((await api("GET", "/api/products", undefined, false)).status, 401);
             assert.equal((await api("POST", "/api/orders", {
@@ -320,6 +324,22 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             assert.equal(await currentQty(), 18);
         });
 
+        await t.test("Sales analytics report delivered snapshots and delivery date", async () => {
+            const report=await api("GET", "/api/analytics");
+            assert.equal(report.status, 200, JSON.stringify(report.body));
+            assert.ok(report.body.summary.deliveredOrders >= 1);
+            assert.ok(report.body.summary.pairsDelivered >= 2);
+            assert.ok(report.body.articles.some(row => row.artNumber === art && row.units >= 2));
+            assert.ok(report.body.sizes.some(row => row.size === 8));
+            assert.ok(report.body.shops.some(row => row.topArtNumber === art));
+            assert.equal(report.body.trends.length, 8);
+            // A newly completed order gets its actual timestamp; historical
+            // undated rows remain untouched after migration.
+            const complete = await pool.query(
+                "SELECT completed_at FROM orders WHERE company_name=$1 AND status='Completed' ORDER BY id DESC LIMIT 1",[company]
+            );
+            assert.ok(complete.rows[0]?.completed_at);
+        });
         await t.test("Customers can sign up by phone and cannot pick an admin role", async () => {
             const sign = await api("POST", "/api/auth/signup", {
                 phone: customerPhone, name: "Test Customer", shop_name: shopName,
@@ -351,6 +371,10 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             const status = await customerApi("GET", "/api/auth/session");
             assert.equal(status.body.role, "customer");
             assert.equal(status.body.authenticated, true);
+        });
+        await t.test("Customer cannot access admin sales analytics", async () => {
+            const forbidden=await customerApi("GET", "/api/analytics");
+            assert.equal(forbidden.status, 401);
         });
         await t.test("Customer can only access customer APIs and never sees stock numbers", async () => {
             assert.equal((await customerApi("GET", "/api/products")).status, 401);

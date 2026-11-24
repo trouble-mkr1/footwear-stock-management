@@ -6,6 +6,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { buildInvoicePdf } = require("./invoice-pdf");
+const { getSalesAnalytics } = require("./analytics");
 
 const session = require("express-session");
 const PgSession = require("connect-pg-simple")(session);
@@ -638,10 +639,23 @@ app.get("/api/customer/products", async (req, res) => {
             GROUP BY p.art_number, p.price, p.mrp, p.brand, pv.id, pv.colour, pv.image
             ORDER BY p.art_number, pv.colour
         `);
+        // Only a simple popularity flag is public, never counts or shop identities.
+        // Do not call an article "Popular" until at least three delivered orders.
+        const popularResult = await pool.query(`
+            SELECT oi.art_number
+            FROM orders o JOIN order_items oi ON oi.order_id=o.id
+            WHERE LOWER(BTRIM(o.status))='completed'
+            GROUP BY oi.art_number
+            HAVING COUNT(DISTINCT o.id) >= 3
+               AND COUNT(DISTINCT o.customer_id) >= 2
+            ORDER BY SUM(oi.quantity) DESC, oi.art_number LIMIT 3
+        `);
+        const popularArts = new Set(popularResult.rows.map(row => row.art_number));
         const catalog = new Map();
         for (const row of result.rows) {
             if (!catalog.has(row.art_number)) catalog.set(row.art_number, {
-                art_number: row.art_number, price: row.price, mrp: row.mrp, brand: row.brand, tags: row.tags, variants: []
+                art_number: row.art_number, price: row.price, mrp: row.mrp, brand: row.brand,
+                tags: row.tags, popular: popularArts.has(row.art_number), variants: []
             });
             catalog.get(row.art_number).variants.push({
                 colour: row.colour, image: row.image, sizes: row.sizes
@@ -830,6 +844,18 @@ app.post("/api/customer/orders", async (req, res) => {
 
 // All API routes below this point require admin authentication
 app.use("/api", requireAdmin);
+
+// Aggregate reports belong to the admin only. Completed means delivered.
+app.get("/api/analytics", async (req, res) => {
+    res.set("Cache-Control", "private, no-store");
+    try {
+        return res.json(await getSalesAnalytics(pool));
+    } catch (error) {
+        console.error("Analytics query failed:", error);
+        return res.status(500).json({ error: "Unable to load analytics. Check that migration 004 was applied." });
+    }
+});
+
 
 
 // Additive bulk inventory workflow. Existing single-size API endpoints stay available.
@@ -1844,7 +1870,7 @@ app.put("/api/orders/:id/complete", async (req, res) => {
 
         const result = await pool.query(
             `UPDATE orders
-             SET status = 'Completed'
+             SET status = 'Completed', completed_at = NOW()
              WHERE id = $1
              AND status = 'Pending'
              RETURNING *`,

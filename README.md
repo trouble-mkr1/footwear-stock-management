@@ -177,3 +177,27 @@ Remove-Item Env:RUN_DB_TESTS
 ```
 
 The integration tests need `TEST_DB_NAME=footwear_inventory_test` in the local `.env`, both database migrations `002` and `003` already applied to that test database, and a working PostgreSQL instance. They use a temporary test image directory and remove their own fixtures. Review `INSTALL_MILESTONE7_MATRIX.md` for detailed steps and manual verification.
+
+
+## Sales analytics (Milestone 7.4)
+
+After backing up the database, run `database/migrations/004_sales_reporting_dates.sql`
+first in `footwear_inventory_test`, then in your development database once tests pass.
+This additive migration gives **new orders** a creation date and records a delivery
+time when an admin marks an order Completed. Historical orders are **not assigned
+invented dates**; their `created_at` and `completed_at` remain `NULL`.
+
+The admin-only **ANALYTICS** sidebar page reports all-time delivered order
+volumes by brand, art number, footwear size and shop, using saved order-item
+prices for monetary values. Pending orders do not count as sales. Previously
+recorded unpriced lines are omitted from the sales-value calculation and shown
+as a warning. Historical manual shop names remain separate from authenticated
+customer accounts to avoid merging unrelated shops. The 8-week trend starts
+tracking deliveries only after migration 004; all-time reports still include
+older Completed orders.
+
+The customer catalogue can display **Popular with shops** on up to three
+articles with at least three delivered orders. It never sends stock counts,
+shop identities, or order counts to the customer's browser. This is an
+all-time popularity label, not a claim about recent trends or percentage of
+shops ordering. True dated trend badges need sufficient real delivery history.

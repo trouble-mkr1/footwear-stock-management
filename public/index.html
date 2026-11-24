@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/css/hawa-ui.css">
     <link rel="stylesheet" href="/css/admin-polish.css">
     <link rel="stylesheet" href="/css/inventory-matrix.css">
+    <link rel="stylesheet" href="/css/analytics.css">
 </head>
 
 <body>
@@ -38,6 +39,8 @@
     <button class="nav-button" id="product-button">
         PRODUCT
     </button>
+
+    <button class="nav-button" id="analytics-button">ANALYTICS</button>
 
     <button class="nav-button" id="orders-button">
         ORDERS
@@ -96,6 +99,44 @@
     </section>
 </section>
 
+
+<!-- Admin-only delivered-order analytics. -->
+<section id="analytics-page" class="hidden" aria-labelledby="analytics-heading">
+  <div class="analytics-title-row">
+    <div><h2 id="analytics-heading">Sales Analytics</h2>
+      <p class="analytics-subtitle">Completed means delivered. Rankings include historical completed orders.</p></div>
+    <button type="button" id="analytics-refresh">Refresh Analytics</button>
+  </div>
+  <p id="analytics-loading" role="status" class="hidden">Loading analytics...</p>
+  <p id="analytics-error" role="alert" class="hidden"></p>
+  <div id="analytics-content" class="hidden">
+    <div class="analytics-summary">
+      <article class="analytics-stat"><span class="analytics-stat-label">Delivered Orders</span><strong class="analytics-stat-value" id="analytics-delivered">—</strong></article>
+      <article class="analytics-stat"><span class="analytics-stat-label">Pairs Delivered</span><strong class="analytics-stat-value" id="analytics-pairs">—</strong></article>
+      <article class="analytics-stat"><span class="analytics-stat-label">Recorded Sales Value</span><strong class="analytics-stat-value" id="analytics-value">—</strong></article>
+      <article class="analytics-stat"><span class="analytics-stat-label">Historic Orders Without Delivery Date</span><strong class="analytics-stat-value" id="analytics-undated">—</strong></article>
+    </div>
+    <p class="analytics-note" id="analytics-unpriced-note"></p>
+    <div class="analytics-grid">
+      <section class="analytics-panel"><h3>Top Brands</h3>
+        <p class="analytics-panel-description">Ranked by pairs delivered, across all completed orders.</p><div id="analytics-brands"></div></section>
+      <section class="analytics-panel"><h3>Top Articles</h3>
+        <p class="analytics-panel-description">Most delivered art numbers, including older orders.</p><div id="analytics-articles"></div></section>
+      <section class="analytics-panel"><h3>Most Requested Sizes</h3>
+        <p class="analytics-panel-description">Sizes ranked by delivered pairs.</p>
+        <div class="analytics-table-wrap"><table class="analytics-table"><thead><tr><th>Size</th><th>Pairs</th><th>Orders</th></tr></thead><tbody id="analytics-sizes"></tbody></table></div>
+      </section>
+      <section class="analytics-panel"><h3>Shop Purchase Patterns</h3>
+        <p class="analytics-panel-description">Top article for each shop, ranked by total delivered pairs. Historical manually-entered shop names remain separate from registered accounts.</p>
+        <div class="analytics-table-wrap"><table class="analytics-table"><thead><tr><th>Shop</th><th>Top Article</th><th>Article Pairs</th><th>Shop Total Pairs</th></tr></thead><tbody id="analytics-shops"></tbody></table></div>
+      </section>
+      <section class="analytics-panel" style="grid-column:1/-1"><h3>Recent Deliveries — Last 8 Weeks</h3>
+        <p class="analytics-panel-description">Date-based chart includes only deliveries recorded after migration 004. Older undated completed orders remain in the all-time rankings above.</p>
+        <div id="analytics-trend" class="analytics-trend" aria-label="Delivered pairs by week"></div>
+      </section>
+    </div>
+  </div>
+</section>
 
 <div id="page-head" class="page-header product-toolbar hidden">
     <h2>PRODUCTS</h2>
@@ -292,6 +333,7 @@
     <script src = "/js/script.js"></script>
     <script src = "/js/inventory-matrix.js"></script>
     <script src = "/js/orders.js"></script>
+    <script src="/js/analytics.js"></script>
 
 </body>
 

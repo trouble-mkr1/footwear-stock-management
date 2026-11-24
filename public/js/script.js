@@ -396,6 +396,7 @@ function returnToProductsPage() {
 // Hide all main content sections
 function hideAllMainSections() {
     dashboardPage.classList.add("hidden");
+    document.getElementById("analytics-page").classList.add("hidden");
     pageHead.classList.add("hidden");
     productsContainer.classList.add("hidden");
     productDetails.classList.add("hidden");
