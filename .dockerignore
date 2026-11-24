@@ -1,0 +1,22 @@
+# Only application source and its runtime requirements are sent to Docker.
+# Tests, SQL files, Git history, local secrets, backups, docs are excluded.
+**
+!Dockerfile
+!.dockerignore
+!package.json
+!package-lock.json
+!server/
+!server/**
+!public/
+!public/**
+!deploy/
+!deploy/docker-entrypoint.sh
+
+# Never copy secret files, even if accidentally placed in an included folder.
+**/.env
+**/.env.*
+**/*.backup
+**/*.dump
+**/*_backup.sql
+**/node_modules/**
+**/storage/**
