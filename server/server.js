@@ -1189,17 +1189,29 @@ app.get("/api/dashboard", async (req, res) => {
             `)
         ]);
 
+        // Split the <= 5 results into mutually exclusive categories.
+        // This keeps zero-stock articles from being counted as low stock.
+        const lowStockProducts = [];
+        const outStockProducts = [];
+        for (const row of lowStockResult.rows) {
+            const product = {
+                art_number: row.art_number,
+                total_stock: Number(row.total_stock)
+            };
+            if (product.total_stock === 0) outStockProducts.push(product);
+            else if (product.total_stock > 0 && product.total_stock <= 5) lowStockProducts.push(product);
+        }
+
         res.json({
             totalProducts: Number(productResult.rows[0].total_products),
             totalStock: Number(stockResult.rows[0].total_stock),
             totalOrders: Number(orderResult.rows[0].total_orders),
             pendingOrders: Number(orderResult.rows[0].pending_orders),
             completedOrders: Number(orderResult.rows[0].completed_orders),
-            lowStock: lowStockResult.rows.length,
-            lowStockProducts: lowStockResult.rows.map(row => ({
-                art_number: row.art_number,
-                total_stock: Number(row.total_stock)
-            }))
+            lowStock: lowStockProducts.length,
+            lowStockProducts,
+            outStock: outStockProducts.length,
+            outStockProducts
         });
     } catch (error) {
         console.error("Dashboard error:", error);

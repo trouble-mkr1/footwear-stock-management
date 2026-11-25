@@ -8,7 +8,9 @@ test("Analytics counts all Completed orders, even those without item rows",()=>{
  assert.match(sql,/LEFT JOIN order_items oi ON oi\.order_id = o\.id/);
  assert.match(sql,/orders_without_items/);
  assert.match(sql,/oi\.id IS NOT NULL/);
- assert.match(read("public/index.html"),/Delivered Orders Missing Item Details/);
+ const ui=read("public/index.html");
+ assert.doesNotMatch(ui,/Delivered Orders Missing Item Details|analytics-unpriced-note/);
+ assert.match(ui,/<h2 id="analytics-heading">Analytics<\/h2>/);
 });
 test("Customer bestseller is derived from completed order quantities and keeps original multi-shop rule",()=>{
  const code=read("server/server.js");

@@ -95,9 +95,9 @@ function validateImageFile(file) {
 
 
 // Dashboard summary and low-stock drill-down
-function renderLowStockTable(products) {
-    const rows = document.getElementById("low-stock-table-body");
-    const empty = document.getElementById("low-stock-empty");
+function renderStockTable(products, rowsId, emptyId) {
+    const rows = document.getElementById(rowsId);
+    const empty = document.getElementById(emptyId);
     rows.replaceChildren();
     const list = Array.isArray(products) ? products : [];
     empty.classList.toggle("hidden", list.length !== 0);
@@ -126,9 +126,11 @@ async function loadDashboard() {
         document.getElementById("total-stock").textContent = data.totalStock;
         document.getElementById("total-orders").textContent = data.totalOrders;
         document.getElementById("low-stock").textContent = data.lowStock;
+        document.getElementById("out-stock").textContent = data.outStock;
         document.getElementById("pending-orders").textContent = data.pendingOrders;
         document.getElementById("completed-orders").textContent = data.completedOrders;
-        renderLowStockTable(data.lowStockProducts);
+        renderStockTable(data.lowStockProducts, "low-stock-table-body", "low-stock-empty");
+        renderStockTable(data.outStockProducts, "out-stock-table-body", "out-stock-empty");
     } catch (error) {
         console.error("Dashboard error:", error);
         HawaUI.toast("Dashboard could not refresh. Please try again.", "warning");
@@ -148,19 +150,28 @@ document.getElementById("completed-orders-card").addEventListener("click", () =>
     openOrdersWithStatus("completed");
 });
 
-const lowStockPanel = document.getElementById("low-stock-panel");
-const lowStockCard = document.getElementById("low-stock-card");
-lowStockCard.addEventListener("click", () => {
-    const show = lowStockPanel.classList.contains("hidden");
-    lowStockPanel.classList.toggle("hidden", !show);
-    lowStockCard.setAttribute("aria-expanded", String(show));
-    if (show) lowStockPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-});
-document.getElementById("close-low-stock").addEventListener("click", () => {
-    lowStockPanel.classList.add("hidden");
-    lowStockCard.setAttribute("aria-expanded", "false");
-    lowStockCard.focus();
-});
+function connectStockPanel(cardId, panelId, closeId, otherCardId, otherPanelId) {
+    const card = document.getElementById(cardId);
+    const panel = document.getElementById(panelId);
+    card.addEventListener("click", () => {
+        const show = panel.classList.contains("hidden");
+        panel.classList.toggle("hidden", !show);
+        card.setAttribute("aria-expanded", String(show));
+        // Keep the dashboard tidy by showing only one stock table at a time.
+        if (show) {
+            document.getElementById(otherPanelId).classList.add("hidden");
+            document.getElementById(otherCardId).setAttribute("aria-expanded", "false");
+            panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+    });
+    document.getElementById(closeId).addEventListener("click", () => {
+        panel.classList.add("hidden");
+        card.setAttribute("aria-expanded", "false");
+        card.focus();
+    });
+}
+connectStockPanel("low-stock-card", "low-stock-panel", "close-low-stock", "out-stock-card", "out-stock-panel");
+connectStockPanel("out-stock-card", "out-stock-panel", "close-out-stock", "low-stock-card", "low-stock-panel");
 
 // Load dashboard when the page opens
 loadDashboard();
