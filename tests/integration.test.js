@@ -498,7 +498,8 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
         await t.test("Other customers cannot see someone else's order history", async () => {
             const sign = await api("POST", "/api/auth/signup", {
                 phone: otherPhone, name: "Other Customer", shop_name: "Unrelated Shop",
-                address: "Somewhere else", password: "CustomerPassword-456"
+                address: "Somewhere else", gst_number: "29ABCDE1234F1Z5",
+                password: "CustomerPassword-456"
             }, false);
             assert.equal(sign.status, 201, JSON.stringify(sign.body));
             otherCustomerId = (await pool.query("SELECT id FROM customers WHERE phone=$1", [otherPhone])).rows[0].id;
@@ -510,6 +511,84 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             const orders = await customerApi("GET", "/api/customer/orders", undefined, true);
             assert.equal(orders.status, 200);
             assert.deepEqual(orders.body, []);
+        });
+        await t.test("Admin customer directory shows optional GSTIN, not password hashes", async () => {
+            const notAdmin = await customerApi("GET", "/api/admin/customers");
+            assert.equal(notAdmin.status, 401);
+            const publicRequest = await api("GET", "/api/admin/customers", undefined, false);
+            assert.equal(publicRequest.status, 401);
+            const list = await api("GET", "/api/admin/customers");
+            assert.equal(list.status, 200);
+            const record = list.body.find(row => Number(row.id) === Number(otherCustomerId));
+            assert.ok(record);
+            assert.equal(record.gst_number, "29ABCDE1234F1Z5");
+            assert.equal(record.phone, otherPhone);
+            assert.equal(Object.hasOwn(record,"password_hash"), false);
+            assert.equal(Object.hasOwn(record,"password"), false);
+            const invalidPhone = String(crypto.randomInt(1000000000,9999999999));
+            const invalid = await api("POST", "/api/auth/signup", {
+                phone:invalidPhone, name:"Invalid", shop_name:"Invalid Shop",
+                address:"Test", gst_number:"123NOTGST", password:"CustomerPassword-123"
+            }, false);
+            assert.equal(invalid.status,400);
+        });
+        await t.test("Customer can edit only their own account details without altering past orders", async () => {
+            const old = await customerApi("GET", "/api/customer/profile");
+            assert.equal(old.status, 200);
+            assert.equal(old.body.phone, customerPhone);
+            const oldHash = (await pool.query("SELECT password_hash FROM customers WHERE id=$1", [customerId])).rows[0].password_hash;
+            const oldOrders = await pool.query("SELECT id, company_name, address FROM orders WHERE customer_id=$1 ORDER BY id", [customerId]);
+            const badGst = await customerApi("PUT", "/api/customer/profile", {
+                name:"Updated Name",shop_name:"Updated Shop",address:"Updated Address",gst_number:"INVALID"
+            });
+            assert.equal(badGst.status, 400);
+            const otherBefore = await customerApi("GET", "/api/customer/profile", undefined, true);
+            assert.equal(otherBefore.status, 200);
+            try {
+                const edit = await customerApi("PUT", "/api/customer/profile", {
+                    name:"Updated Name",shop_name:"Updated Shop",address:"Updated Address",
+                    gst_number:"29ABCDE1234F1Z5",phone:"0000000000",role:"admin",password_hash:"bad"
+                });
+                assert.equal(edit.status, 200, JSON.stringify(edit.body));
+                assert.equal(edit.body.name,"Updated Name");
+                assert.equal(edit.body.shop_name,"Updated Shop");
+                assert.equal(edit.body.address,"Updated Address");
+                assert.equal(edit.body.gst_number,"29ABCDE1234F1Z5");
+                assert.equal(edit.body.phone,customerPhone);
+                assert.equal(Object.hasOwn(edit.body,"password_hash"),false);
+                const fresh = await customerApi("GET", "/api/customer/profile");
+                assert.equal(fresh.body.shop_name,"Updated Shop");
+                const otherAfter = await customerApi("GET", "/api/customer/profile", undefined, true);
+                assert.deepEqual(otherAfter.body,otherBefore.body);
+                const savedHash = (await pool.query("SELECT password_hash FROM customers WHERE id=$1", [customerId])).rows[0].password_hash;
+                assert.equal(savedHash,oldHash);
+                const ordersAfter = await pool.query("SELECT id, company_name, address FROM orders WHERE customer_id=$1 ORDER BY id", [customerId]);
+                assert.deepEqual(ordersAfter.rows,oldOrders.rows);
+            } finally {
+                const restore = await customerApi("PUT", "/api/customer/profile", {
+                    name:old.body.name,shop_name:old.body.shop_name,address:old.body.address,
+                    gst_number:old.body.gst_number || ""
+                });
+                assert.equal(restore.status,200,JSON.stringify(restore.body));
+            }
+        });
+        await t.test("Signup rejects seven-character passwords and accepts eight", async () => {
+            const shortPhone = String(crypto.randomInt(1000000000,9999999999));
+            const short = await api("POST", "/api/auth/signup", {
+                phone:shortPhone,name:"Short Password",shop_name:"Test Shop",
+                address:"Test Address",password:"short77"
+            }, false);
+            assert.equal(short.status,400);
+            const phone = String(crypto.randomInt(1000000000,9999999999));
+            try {
+                const created = await api("POST", "/api/auth/signup", {
+                    phone,name:"Eight Password",shop_name:"Test Shop",
+                    address:"Test Address",password:"eight888"
+                }, false);
+                assert.equal(created.status,201,JSON.stringify(created.body));
+            } finally {
+                await pool.query("DELETE FROM customers WHERE phone=$1",[phone]);
+            }
         });
         await t.test("Admin completion displays as Received; reorder is a NEW order", async () => {
             const before = await customerApi("GET", "/api/customer/orders");
@@ -565,6 +644,57 @@ test("Order API lifecycle against an isolated PostgreSQL test database", { timeo
             const unchanged = await pool.query("SELECT brand,price FROM products WHERE art_number=$1",[art]);
             assert.equal(unchanged.rows[0].brand,"Integration Brand");
             assert.equal(Number(unchanged.rows[0].price),599.29);
+        });
+        await t.test("Product deletion blocks pending orders and keeps completed invoices", async () => {
+            const delArt = `TESTDEL_${suffix}`;
+            let orderId;
+            try {
+                await pool.query("INSERT INTO products (art_number, price, mrp, brand) VALUES ($1,450,750,$2)",
+                    [delArt,"Archived Brand"]);
+                await pool.query("INSERT INTO product_tags (art_number,tag) VALUES ($1,'Casual')",[delArt]);
+                const variant = await pool.query(
+                    "INSERT INTO product_variant (art_number,colour,image) VALUES ($1,'Black','test-fixture.jpg') RETURNING id",[delArt]);
+                await pool.query("INSERT INTO stock (variant_id,size,quantity) VALUES ($1,8,10)",[variant.rows[0].id]);
+                const forbidden = await customerApi("DELETE",`/api/products/${encodeURIComponent(delArt)}`);
+                assert.equal(forbidden.status,401);
+                const created = await api("POST","/api/orders",{
+                    company_name:company+" deleted",address:"Delete demo",
+                    items:[{art_number:delArt,colour:"Black",size:8,quantity:2}]
+                });
+                assert.equal(created.status,201,JSON.stringify(created.body));
+                orderId=created.body.order_id;
+                const pending = await api("DELETE",`/api/products/${encodeURIComponent(delArt)}`);
+                assert.equal(pending.status,409,JSON.stringify(pending.body));
+                assert.equal((await pool.query("SELECT COUNT(*) AS count FROM products WHERE art_number=$1",[delArt])).rows[0].count,"1");
+                const completed = await api("PUT",`/api/orders/${orderId}/complete`);
+                assert.equal(completed.status,200);
+                const deleted = await api("DELETE",`/api/products/${encodeURIComponent(delArt)}`);
+                assert.equal(deleted.status,200,JSON.stringify(deleted.body));
+                const oldItems = await pool.query("SELECT art_number,quantity,unit_price,mrp FROM order_items WHERE order_id=$1",[orderId]);
+                assert.equal(oldItems.rows.length,1);
+                assert.equal(oldItems.rows[0].art_number,delArt);
+                assert.equal(Number(oldItems.rows[0].unit_price),450);
+                assert.equal((await pool.query("SELECT COUNT(*) AS count FROM products WHERE art_number=$1",[delArt])).rows[0].count,"0");
+                assert.equal((await pool.query("SELECT COUNT(*) AS count FROM product_variant WHERE art_number=$1",[delArt])).rows[0].count,"0");
+                assert.equal((await pool.query("SELECT COUNT(*) AS count FROM product_tags WHERE art_number=$1",[delArt])).rows[0].count,"0");
+                const tombstone=await pool.query("SELECT brand FROM deleted_products WHERE art_number=$1",[delArt]);
+                assert.equal(tombstone.rows[0].brand,"Archived Brand");
+                const invoice=await api("GET", `/api/orders/${orderId}`);
+                assert.equal(invoice.status,200);
+                const analytics=await api("GET","/api/analytics");
+                assert.equal(analytics.status,200);
+                assert.ok(analytics.body.brands.some(b=>b.brand==="Archived Brand"));
+            } finally {
+                if (orderId) {
+                    await pool.query("DELETE FROM order_items WHERE order_id=$1",[orderId]);
+                    await pool.query("DELETE FROM orders WHERE id=$1",[orderId]);
+                }
+                await pool.query("DELETE FROM stock WHERE variant_id IN (SELECT id FROM product_variant WHERE art_number=$1)",[delArt]);
+                await pool.query("DELETE FROM product_variant WHERE art_number=$1",[delArt]);
+                await pool.query("DELETE FROM product_tags WHERE art_number=$1",[delArt]);
+                await pool.query("DELETE FROM products WHERE art_number=$1",[delArt]);
+                await pool.query("DELETE FROM deleted_products WHERE art_number=$1",[delArt]);
+            }
         });
     } catch (err) {
         err.message += `\nTest server output:\n${output}`;

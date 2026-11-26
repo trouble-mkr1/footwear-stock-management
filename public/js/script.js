@@ -188,7 +188,8 @@ fetch("/api/products")
     })
     .then(products => {
         allProducts = products;
-        displayProducts(products);
+        renderAdminBrandFilters();
+        displayProducts(filterAdminProducts(document.getElementById("product-search").value));
     })
     .catch(error => {
         console.error("Error Loading Products:", error);
@@ -214,6 +215,7 @@ async function refreshProducts() {
             .getElementById("product-search")
             .value.trim();
 
+        renderAdminBrandFilters();
         displayProducts(filterAdminProducts(searchText));
 
         return true;
@@ -224,10 +226,38 @@ async function refreshProducts() {
     }
 }
 
+let selectedAdminBrand = "";
+function adminBrandKey(value) {
+    return String(value || "Unbranded").trim().toLocaleLowerCase() || "unbranded";
+}
+function renderAdminBrandFilters() {
+    const strip = document.getElementById("admin-brand-filters");
+    strip.replaceChildren();
+    const brands = new Map();
+    for (const product of allProducts) {
+        const name = String(product.brand || "Unbranded").trim() || "Unbranded";
+        const key = adminBrandKey(name);
+        if (!brands.has(key)) brands.set(key, name);
+    }
+    if (selectedAdminBrand && !brands.has(selectedAdminBrand)) selectedAdminBrand = "";
+    const entries = [["", "All Brands"], ...[...brands].sort((a,b) => a[1].localeCompare(b[1]))];
+    for (const [key, label] of entries) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "brand-filter-chip";
+        button.textContent = label;
+        button.setAttribute("aria-pressed", String(selectedAdminBrand === key));
+        button.addEventListener("click", () => {
+            selectedAdminBrand = key;
+            renderAdminBrandFilters();
+            displayProducts(filterAdminProducts(document.getElementById("product-search").value));
+        });
+        strip.appendChild(button);
+    }
+}
 function filterAdminProducts(search) {
     const query = String(search || '').trim().toLocaleLowerCase();
-    if (!query) return allProducts;
-    return allProducts.filter(product => [
+    return allProducts.filter(product => (!selectedAdminBrand || adminBrandKey(product.brand) === selectedAdminBrand) && [
         String(product.art_number), product.brand || '',
         ...(Array.isArray(product.tags) ? product.tags : []),
         ...((product.variants || []).map(variant => variant.colour || ''))
@@ -309,10 +339,12 @@ function displayProducts(products) {
 function showProductDetails(product) {
     const productsContainer = document.getElementById('products-container');
     const productDetails = document.getElementById('product-details');
+    document.getElementById("admin-brand-filters").classList.add("hidden");
     productsContainer.classList.add('hidden');
     productDetails.classList.remove('hidden');
     document.getElementById('details-art-number').textContent = `Art No: ${product.art_number}`;
     document.getElementById('edit-product-button').dataset.artNumber = product.art_number;
+    document.getElementById('delete-product-button').dataset.artNumber = product.art_number;
     const priceBox = document.getElementById('details-price');
     priceBox.replaceChildren();
     for (const [label, value] of [
@@ -378,6 +410,7 @@ document.getElementById("back-button").addEventListener("click",()=>{
     const productDetails=document.getElementById("product-details");
     productDetails.classList.add("hidden");
     productsContainer.classList.remove("hidden");
+    document.getElementById("admin-brand-filters").classList.remove("hidden");
 });
 
 //search bar functionality
@@ -402,6 +435,7 @@ function returnToProductsPage() {
     hideAllMainSections();
     pageHead.classList.remove("hidden");
     productsContainer.classList.remove("hidden");
+    document.getElementById("admin-brand-filters").classList.remove("hidden");
     updateActiveNav(productButton);
 }
 
@@ -413,6 +447,8 @@ function hideAllMainSections() {
     pageHead.classList.add("hidden");
     productsContainer.classList.add("hidden");
     productDetails.classList.add("hidden");
+    document.getElementById("admin-brand-filters").classList.add("hidden");
+    document.getElementById("customers-page").classList.add("hidden");
     inventoryMatrixPage.classList.add("hidden");
     document.getElementById("orders-page").classList.add("hidden");
     document.getElementById("add-order-form").classList.add("hidden");
@@ -443,6 +479,7 @@ productButton.addEventListener("click", async () => {
     hideAllMainSections();
     pageHead.classList.remove("hidden");
     productsContainer.classList.remove("hidden");
+    document.getElementById("admin-brand-filters").classList.remove("hidden");
 
     updateActiveNav(productButton);
     await refreshProducts();

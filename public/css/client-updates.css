@@ -1,0 +1,30 @@
+/* Customer-requested brand chips and safe product deletion — blue and white. */
+.brand-filter-strip { display:flex; flex-wrap:nowrap; gap:9px; overflow-x:auto; overscroll-behavior-x:contain;
+    padding:5px 2px 14px; margin-bottom:13px; scroll-snap-type:x proximity; scrollbar-width:thin;
+    max-width:100%; min-width:0; }
+.brand-filter-strip.hidden { display:none!important; }
+.brand-filter-chip { border:1px solid #bdd4f4; border-radius:999px; background:#fff; color:#174d93;
+    padding:9px 17px; min-height:42px; white-space:nowrap; flex:0 0 auto; font:inherit; font-size:14px;
+    font-weight:700; cursor:pointer; scroll-snap-align:start; }
+.brand-filter-chip:hover { background:#edf5ff; border-color:#1262cf; }
+.brand-filter-chip[aria-pressed="true"] { color:#fff; background:#075cd3; border-color:#075cd3; }
+.brand-filter-chip:focus-visible { outline:3px solid #8ebcfa; outline-offset:2px; }
+.product-details-actions { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.delete-product-button { border:1px solid #bd354b; border-radius:8px; background:#fff5f6;
+    color:#9d2036; font:inherit; font-size:14px; font-weight:750; padding:10px 14px; cursor:pointer; }
+.delete-product-button:hover { background:#ffe8eb; }
+.delete-product-button:disabled { opacity:.6; cursor:wait; }
+#customers-page { max-width:100%; }
+#customers-page .page-header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+#customers-search { display:block; max-width:580px; width:100%; min-height:46px; padding:12px;
+    background:white; border:1px solid #bfcee4; border-radius:9px; font:inherit; color:#163657; margin:10px 0 12px; }
+.customers-help { color:#617690; font-size:13px; margin:0 0 14px; }
+#customers-message { color:#395a7e; margin:11px 0; font-size:14px; }
+.customers-table-wrap { width:100%; overflow-x:auto; border:1px solid #d4e3f6; border-radius:12px; background:#fff; }
+.customers-table { width:100%; min-width:690px; border-collapse:collapse; }
+.customers-table th { text-align:left; color:#164a8b; background:#eaf3ff; font-size:14px; }
+.customers-table td,.customers-table th { padding:13px 14px; border-bottom:1px solid #e4eaf2; vertical-align:top; }
+.customers-table td { color:#233c5a; font-size:14px; overflow-wrap:anywhere; }
+.customers-table tr:last-child td { border-bottom:0; }
+@media(max-width:640px) { .brand-filter-chip { padding:8px 13px; font-size:13px; }
+    .product-details-actions { width:100%; } .product-details-actions button { flex:1 1 auto; } }

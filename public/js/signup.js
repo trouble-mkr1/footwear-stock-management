@@ -12,6 +12,11 @@ signupForm.addEventListener("submit", async event => {
         signupError.textContent = "Passwords do not match.";
         return;
     }
+    const gst = document.getElementById("signup-gst").value.trim().toUpperCase();
+    if (gst && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/.test(gst)) {
+        signupError.textContent = "Enter a valid 15-character GSTIN, or leave it blank.";
+        return;
+    }
     signupButton.disabled = true;
     signupButton.textContent = "Creating account...";
     try {
@@ -22,13 +27,14 @@ signupForm.addEventListener("submit", async event => {
                 phone: document.getElementById("signup-phone").value.trim(),
                 shop_name: document.getElementById("signup-shop").value.trim(),
                 address: document.getElementById("signup-address").value.trim(),
+                gst_number: document.getElementById("signup-gst").value.trim().toUpperCase(),
                 password
             })
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Unable to sign up.");
-        signupSuccess.textContent = "Account created! You can now log in.";
         signupForm.reset();
+        window.location.replace("/?signup=success");
     } catch (error) {
         signupError.textContent = error.message;
     } finally {

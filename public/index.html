@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/css/inventory-matrix.css">
     <link rel="stylesheet" href="/css/analytics.css">
     <link rel="stylesheet" href="/css/product-edit.css">
+    <link rel="stylesheet" href="/css/client-updates.css">
 </head>
 
 <body>
@@ -51,6 +52,8 @@
         onclick="window.location.href='/billing.html'">
         BILLING
     </button>
+
+    <button type="button" class="nav-button" id="customers-button">CUSTOMERS</button>
 
 </aside>
 
@@ -154,6 +157,19 @@
   </div>
 </section>
 
+<section id="customers-page" class="hidden" aria-labelledby="customers-heading">
+  <div class="page-header"><h2 id="customers-heading">Customers</h2>
+    <button type="button" id="customers-refresh" class="secondary-action">Refresh</button></div>
+  <label for="customers-search" class="sr-only">Search customers</label>
+  <input id="customers-search" type="search" placeholder="Search name, shop, phone or GSTIN..." autocomplete="off">
+  <p class="customers-help">Customer passwords cannot be viewed. They are protected with one-way hashing.</p>
+  <p id="customers-message" role="status"></p>
+  <div class="customers-table-wrap"><table class="customers-table">
+    <thead><tr><th>Customer Name</th><th>Phone / Login ID</th><th>Shop Name</th><th>Address</th><th>GSTIN</th></tr></thead>
+    <tbody id="customers-table-body"></tbody>
+  </table></div>
+</section>
+
 <div id="page-head" class="page-header product-toolbar hidden">
     <h2>PRODUCTS</h2>
     <div class="search-container">
@@ -164,6 +180,8 @@
         <button type="button" id="add-new-product-button">+ New Product</button>
     </div>
 </div>
+
+            <nav id="admin-brand-filters" class="brand-filter-strip hidden" aria-label="Filter products by brand"></nav>
 
             <!-- PRODUCT CATALOGUE -->
             <div id="products-container" class="products-grid hidden">
@@ -180,7 +198,10 @@
 
                 <div class="details-heading-row">
                     <h2 id="details-art-number"></h2>
-                    <button type="button" id="edit-product-button" class="secondary-action">Edit Product Details</button>
+                    <div class="product-details-actions">
+                      <button type="button" id="edit-product-button" class="secondary-action">Edit Product Details</button>
+                      <button type="button" id="delete-product-button" class="delete-product-button">Delete Product</button>
+                    </div>
                 </div>
                 <div id="details-price" class="details-facts" aria-label="Product details"></div>
                 <div id="details-tags" class="details-tags" aria-label="Product tags"></div>
@@ -387,6 +408,8 @@
     <script src="/js/product-edit.js"></script>
     <script src = "/js/orders.js"></script>
     <script src="/js/analytics.js"></script>
+    <script src="/js/customers-admin.js"></script>
+    <script src="/js/admin-deeplink.js"></script>
 
 </body>
 

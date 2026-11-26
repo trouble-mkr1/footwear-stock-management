@@ -489,21 +489,25 @@ app.post("/api/auth/signup", signupLimiter, async (req, res) => {
     const address = cleanText(req.body?.address, 1000);
     const phone = normalizePhone(req.body?.phone);
     const password = typeof req.body?.password === "string" ? req.body.password : "";
+    const gst = String(req.body?.gst_number ?? "").trim().toUpperCase();
+    if (gst && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/.test(gst)) {
+        return res.status(400).json({ error: "Enter a valid 15-character GSTIN, or leave it blank." });
+    }
     if (!name || !shopName || !address || !phone) {
         return res.status(400).json({ error: "Enter a valid name, phone number, shop name and address." });
     }
     if (phone === process.env.ADMIN_USERNAME) {
         return res.status(400).json({ error: "This phone number cannot be registered." });
     }
-    if (password.length < 10 || password.length > 128) {
-        return res.status(400).json({ error: "Password must contain 10 to 128 characters." });
+    if (password.length < 8 || password.length > 128) {
+        return res.status(400).json({ error: "Password must contain at least 8 characters (maximum 128)." });
     }
     try {
         const hash = await bcrypt.hash(password, 12);
         await pool.query(
-            `INSERT INTO customers (phone, name, shop_name, address, password_hash)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [phone, name, shopName, address, hash]
+            `INSERT INTO customers (phone, name, shop_name, address, password_hash, gst_number)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [phone, name, shopName, address, hash, gst || null]
         );
         return res.status(201).json({ message: "Account created. You can now log in." });
     } catch (error) {
@@ -608,7 +612,7 @@ app.use("/api/customer", requireCustomer);
 app.get("/api/customer/profile", async (req, res) => {
     try {
         const result = await pool.query(
-            "SELECT name, shop_name, phone, address FROM customers WHERE id=$1",
+            "SELECT name, shop_name, phone, address, gst_number FROM customers WHERE id=$1",
             [req.session.customerId]
         );
         if (!result.rows.length) return res.status(401).json({ error: "Account no longer exists." });
@@ -616,6 +620,34 @@ app.get("/api/customer/profile", async (req, res) => {
     } catch (error) {
         console.error("Customer profile error:", error);
         return res.status(500).json({ error: "Unable to load account." });
+    }
+});
+
+// Customers can edit their own contact and shop details, not their account role,
+// phone/login ID, password hash or any historical order/invoice records.
+app.put("/api/customer/profile", async (req, res) => {
+    const name = cleanText(req.body?.name, 100);
+    const shopName = cleanText(req.body?.shop_name, 100);
+    const address = cleanText(req.body?.address, 1000);
+    const gst = String(req.body?.gst_number ?? "").trim().toUpperCase();
+    if (!name || !shopName || !address) {
+        return res.status(400).json({ error: "Please enter your name, shop name and delivery address." });
+    }
+    if (gst && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/.test(gst)) {
+        return res.status(400).json({ error: "Please enter a valid 15-character GSTIN or leave it blank." });
+    }
+    try {
+        const result = await pool.query(
+            `UPDATE customers SET name=$1, shop_name=$2, address=$3, gst_number=$4
+             WHERE id=$5 RETURNING name, shop_name, phone, address, gst_number`,
+            [name, shopName, address, gst || null, req.session.customerId]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: "Customer account not found." });
+        req.session.customerName = result.rows[0].name;
+        return res.json(result.rows[0]);
+    } catch (error) {
+        console.error("Customer profile update error:", error);
+        return res.status(500).json({ error: "Unable to save account details. Please try again." });
     }
 });
 
@@ -982,6 +1014,8 @@ app.post('/api/inventory/bulk', bulkInventoryUpload, async (req, res) => {
         client = await pool.connect();
         await client.query('BEGIN');
         if (mode === 'product') {
+            const retired = await client.query('SELECT 1 FROM deleted_products WHERE art_number=$1', [art]);
+            if (retired.rows.length) bulkInputError('This art number belongs to a deleted product and cannot be reused.', 409);
             await client.query(
                 'INSERT INTO products (art_number, price, mrp, brand) VALUES ($1,$2,$3,$4)',
                 [art, Number(body.price), Number(body.mrp), brand]);
@@ -1098,6 +1132,71 @@ app.put("/api/products/:artNumber/details", async (req, res) => {
     }
 });
 
+// Remove a live article and its variants, size stock and unshared images.
+// Invoice history is retained in order_items; deleted_products stores its former
+// brand for historical analytics and permanently reserves the old art number.
+app.delete("/api/products/:artNumber", async (req, res) => {
+    const art = String(req.params.artNumber || "").trim();
+    if (!art || art.length > 80) return res.status(400).json({ error: "Invalid art number." });
+    let client;
+    let images = [];
+    try {
+        client = await pool.connect();
+        await client.query("BEGIN");
+        const product = await client.query(
+            "SELECT art_number, brand FROM products WHERE art_number=$1 FOR UPDATE", [art]
+        );
+        if (!product.rows.length) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Product not found. Refresh the catalogue." });
+        }
+        const pending = await client.query(`
+            SELECT o.id FROM orders o
+            JOIN order_items oi ON oi.order_id=o.id
+            WHERE oi.art_number=$1 AND LOWER(BTRIM(o.status))='pending'
+            LIMIT 1`, [art]);
+        if (pending.rows.length) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({
+                error: `Art ${art} is included in pending order #${pending.rows[0].id}. Complete or resolve that order before deleting this product.`
+            });
+        }
+        const variants = await client.query(
+            "SELECT id, image FROM product_variant WHERE art_number=$1 FOR UPDATE", [art]);
+        images = [...new Set(variants.rows.map(r => r.image).filter(Boolean))];
+        await client.query("INSERT INTO deleted_products (art_number,brand) VALUES ($1,$2)",
+            [art, product.rows[0].brand]);
+        await client.query(`DELETE FROM stock WHERE variant_id IN
+            (SELECT id FROM product_variant WHERE art_number=$1)`, [art]);
+        await client.query("DELETE FROM product_tags WHERE art_number=$1", [art]);
+        await client.query("DELETE FROM product_variant WHERE art_number=$1", [art]);
+        await client.query("DELETE FROM products WHERE art_number=$1", [art]);
+        await client.query("COMMIT");
+    } catch (error) {
+        await rollbackQuietly(client);
+        console.error("Delete product error:", error);
+        return res.status(500).json({ error: "Unable to delete this product. Nothing was changed." });
+    } finally {
+        if (client) client.release();
+    }
+    // Image files are removed only when no other product still uses them.
+    // File failures do not undo the committed database deletion; log for cleanup.
+    for (const filename of images) {
+        if (!/^[A-Za-z0-9_.-]+$/.test(filename) || filename === "." || filename === "..") continue;
+        try {
+            const stillUsed = await pool.query(
+                "SELECT 1 FROM product_variant WHERE image=$1 LIMIT 1", [filename]);
+            if (stillUsed.rows.length) continue;
+            // Never delete files from the checked-in public/images folder during
+            // a demo that uses an isolated IMAGE_UPLOAD_DIR. Production bundles
+            // are immutable; old bundled assets can be removed from source later.
+            try { await fs.promises.unlink(path.join(imageUploadDir, filename)); }
+            catch (error) { if (error.code !== "ENOENT") console.error("Image cleanup error:", error); }
+        } catch (error) { console.error("Image reference check error:", error); }
+    }
+    return res.json({ message: `Product ${art} and its live stock, colours and images were deleted. Existing invoices are preserved.` });
+});
+
 app.get("/api/products", async (req, res) => {
     try {
         const result = await pool.query(`
@@ -1164,6 +1263,21 @@ app.get("/api/products", async (req, res) => {
 });
 
 
+
+// Admin-only customer directory. Never select or return password_hash.
+app.get("/api/admin/customers", async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT id, name, phone, shop_name, address, gst_number
+            FROM customers ORDER BY id DESC
+        `);
+        res.set("Cache-Control", "no-store");
+        return res.json(result.rows);
+    } catch (error) {
+        console.error("Customers directory error:", error);
+        return res.status(500).json({ error: "Unable to load customers." });
+    }
+});
 
 // Dashboard summary + clickable pending/completed and low-stock details
 app.get("/api/dashboard", async (req, res) => {
@@ -1382,6 +1496,12 @@ app.post("/api/products", uploadProductImage, async (req, res) => {
             [artNumber]
         );
 
+        const retired = await client.query('SELECT 1 FROM deleted_products WHERE art_number=$1', [artNumber]);
+        if (retired.rows.length) {
+            await client.query("ROLLBACK");
+            deleteUploadedImage(image);
+            return res.status(409).json({ error: "This art number was previously deleted and cannot be reused." });
+        }
         if (productResult.rows.length > 0) {
             await client.query("ROLLBACK");
             deleteUploadedImage(image);

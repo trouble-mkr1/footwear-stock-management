@@ -4,7 +4,7 @@
   "description": "Stock and order management system for footwear wholesale business",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/smoke.test.js tests/production-readiness.test.js tests/customer.smoke.test.js tests/inventory-matrix.smoke.test.js tests/inventory-product-polish.test.js tests/customer-cart.smoke.test.js tests/multi-stock-share.smoke.test.js tests/analytics.smoke.test.js tests/product-editor-and-reconciliation.smoke.test.js tests/dashboard-polish.smoke.test.js",
+    "test": "node --test tests/smoke.test.js tests/production-readiness.test.js tests/customer.smoke.test.js tests/inventory-matrix.smoke.test.js tests/inventory-product-polish.test.js tests/customer-cart.smoke.test.js tests/multi-stock-share.smoke.test.js tests/analytics.smoke.test.js tests/product-editor-and-reconciliation.smoke.test.js tests/dashboard-polish.smoke.test.js tests/client-updates.smoke.test.js tests/customer-account.smoke.test.js",
     "start": "node server/server.js",
     "test:integration": "node --test tests/integration.test.js"
   },

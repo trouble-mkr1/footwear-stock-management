@@ -5,6 +5,8 @@
   <title>My Account | HAWA TRADERS</title>
   <link rel="stylesheet" href="/css/hawa-ui.css">
   <link rel="stylesheet" href="/css/customer.css">
+  <link rel="stylesheet" href="/css/client-updates.css">
+  <link rel="stylesheet" href="/css/customer-account.css">
 </head>
 <body class="customer-page">
   <header class="customer-header">
@@ -23,8 +25,31 @@
         <h1 id="welcome-title">Welcome</h1>
         <p class="muted" id="welcome-shop">Browse products and place orders easily.</p>
       </div>
-      <div class="welcome-mark" aria-hidden="true"><span>HT</span></div>
+      <button type="button" class="welcome-mark customer-profile-trigger" id="customer-profile-button"
+              aria-haspopup="dialog" aria-controls="customer-profile-dialog" aria-label="Edit account details"
+              title="View and edit account details"><span id="customer-initials">HT</span></button>
     </section>
+    <dialog id="customer-profile-dialog" class="customer-profile-dialog" aria-labelledby="customer-profile-title">
+      <div class="customer-profile-titlebar">
+        <div><p class="eyebrow">My Account</p><h2 id="customer-profile-title">Account details</h2></div>
+        <button type="button" class="outline-btn" id="customer-profile-close" aria-label="Close account details">Close</button>
+      </div>
+      <p class="muted">You can update your details here. Your phone number is your login ID.</p>
+      <form id="customer-profile-form" class="stack-form">
+        <label for="profile-name">Your name</label>
+        <input type="text" id="profile-name" maxlength="100" autocomplete="name" required>
+        <label for="profile-phone">Phone number (login ID)</label>
+        <input type="tel" id="profile-phone" readonly aria-readonly="true">
+        <label for="profile-shop">Shop name</label>
+        <input type="text" id="profile-shop" maxlength="100" required>
+        <label for="profile-address">Delivery address</label>
+        <textarea id="profile-address" rows="3" maxlength="1000" required></textarea>
+        <label for="profile-gst">GSTIN <span class="muted">(optional)</span></label>
+        <input type="text" id="profile-gst" maxlength="15" autocomplete="off" placeholder="e.g. 29ABCDE1234F1Z5">
+        <p id="profile-error" class="form-error" role="alert"></p>
+        <button class="primary-btn" id="profile-save" type="submit">Save Changes</button>
+      </form>
+    </dialog>
     <nav class="customer-tabs" aria-label="Customer pages">
       <button type="button" class="tab-button active" id="customer-products-tab" aria-current="page">Products</button>
       <button type="button" class="tab-button" id="customer-orders-tab">My Orders</button>
@@ -38,6 +63,7 @@
         <div class="customer-catalogue">
           <label for="customer-search" class="sr-only">Search by art number, brand or tag</label>
           <input type="search" id="customer-search" class="product-search" placeholder="Search by art number, brand or tag...">
+          <nav id="customer-brand-filters" class="brand-filter-strip" aria-label="Filter footwear by brand"></nav>
           <div id="customer-products" class="customer-product-grid" aria-live="polite"><p class="muted">Loading products...</p></div>
         </div>
         <aside class="cart-panel" id="customer-cart-panel" aria-labelledby="cart-title" tabindex="-1">

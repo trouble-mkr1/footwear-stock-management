@@ -2,6 +2,9 @@
 const loginForm = document.getElementById("login-form");
 const loginError = document.getElementById("login-error");
 const loginButton = document.getElementById("login-button");
+if (new URLSearchParams(window.location.search).get("signup") === "success") {
+    document.getElementById("login-success").textContent = "Account created! Please log in.";
+}
 loginForm.addEventListener("submit", async event => {
     event.preventDefault();
     loginError.textContent = "";

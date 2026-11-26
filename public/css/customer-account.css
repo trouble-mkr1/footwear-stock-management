@@ -1,0 +1,16 @@
+/* Customer account editor: one compact overlay, no extra navigation page. */
+.customer-profile-trigger { border: 1px solid #adcdf2; cursor:pointer; font:inherit;
+    transition:transform .15s, background .15s; }
+.customer-profile-trigger:hover { transform:translateY(-1px); background:#c5dfff; }
+.customer-profile-trigger:focus-visible { outline:3px solid #075cd3; outline-offset:3px; }
+.customer-profile-dialog { width:min(520px,calc(100% - 24px)); max-height:min(92vh,760px);
+    overflow:auto; padding:23px; border:1px solid #c6dafa; border-radius:16px;
+    box-shadow:0 22px 80px rgba(17,50,96,.24); color:var(--ink); background:#fff; }
+.customer-profile-dialog::backdrop { background:rgba(9,29,62,.56); }
+.customer-profile-titlebar { display:flex; justify-content:space-between; align-items:start; gap:12px; }
+.customer-profile-titlebar h2 { margin:0; }
+.customer-profile-dialog .stack-form { margin-top:16px; }
+.customer-profile-dialog #profile-phone { background:#f3f6fa; color:#52677f; }
+@media(max-width:640px) { .welcome-banner .welcome-mark { display:grid; flex:0 0 62px;
+    height:62px; font-size:19px; } .customer-profile-dialog { padding:18px; }
+    .customer-profile-titlebar h2 { font-size:21px; } }

@@ -47,6 +47,7 @@ function returnToProduct(product) {
     hideAllMainSections();
     pageHead.classList.remove("hidden");
     productsContainer.classList.remove("hidden");
+    byId("admin-brand-filters").classList.remove("hidden");
     if (product) showProductDetails(product);
     else productDetails.classList.add("hidden");
     updateActiveNav(productButton);
@@ -75,6 +76,29 @@ byId("edit-product-cancel").addEventListener("click", cancel);
 byId("edit-product-add-tag").addEventListener("click", addTags);
 input.addEventListener("keydown", event => {
     if (event.key === "Enter") { event.preventDefault(); addTags(); }
+});
+byId("delete-product-button").addEventListener("click", async () => {
+    const button = byId("delete-product-button");
+    const art = button.dataset.artNumber;
+    if (!art || button.disabled) return;
+    const product = allProducts.find(p => p.art_number === art);
+    if (!product) return HawaUI.alert("This product is no longer available. Refresh Products.");
+    const confirmed = await HawaUI.confirm(
+        `Delete Art ${art} and ALL its colours, sizes, stock and product images? This cannot be undone. Existing completed invoices will remain.`,
+        { title: "Delete Product", confirmText: "Delete Product", destructive: true }
+    );
+    if (!confirmed) return;
+    button.disabled = true;
+    try {
+        const response = await fetch(`/api/products/${encodeURIComponent(art)}`, {method: "DELETE"});
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || "Unable to delete product.");
+        if (!await refreshProducts()) throw new Error("Deleted, but Products did not refresh. Reload the page.");
+        returnToProduct(null);
+        loadDashboard();
+        HawaUI.toast(`Art ${art} deleted. Completed invoices are preserved.`);
+    } catch (error) { await HawaUI.alert(error.message, {title:"Delete Product"}); }
+    finally { button.disabled = false; }
 });
 form.addEventListener("submit", async event => {
     event.preventDefault();

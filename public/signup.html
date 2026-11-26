@@ -21,10 +21,12 @@
         <input id="signup-shop" name="shop_name" type="text" maxlength="100" required>
         <label for="signup-address">Delivery address</label>
         <textarea id="signup-address" name="address" rows="3" maxlength="1000" required></textarea>
-        <label for="signup-password">Password <span class="muted">(at least 10 characters)</span></label>
-        <input id="signup-password" type="password" name="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+        <label for="signup-gst">GSTIN <span class="muted">(optional)</span></label>
+        <input id="signup-gst" name="gst_number" type="text" inputmode="text" maxlength="15" autocomplete="off" placeholder="e.g. 29ABCDE1234F1Z5">
+        <label for="signup-password">Password <span class="muted">(at least 8 characters)</span></label>
+        <input id="signup-password" type="password" name="password" autocomplete="new-password" minlength="8" maxlength="128" required>
         <label for="signup-confirm">Confirm password</label>
-        <input id="signup-confirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+        <input id="signup-confirm" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
         <p class="form-error" id="signup-error" role="alert"></p>
         <p class="form-success" id="signup-success" role="status"></p>
         <button class="primary-btn" type="submit" id="signup-button">Create Account</button>

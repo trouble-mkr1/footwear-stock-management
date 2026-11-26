@@ -5,7 +5,7 @@
     const ordersPage = byId("customer-orders-page");
     const productsTab = byId("customer-products-tab");
     const ordersTab = byId("customer-orders-tab");
-    const state = { products: [], orders: [], cart: [], stockIssues: [] };
+    const state = { products: [], orders: [], cart: [], stockIssues: [], brand: "", profile: null };
     const cartPanel = byId("customer-cart-panel");
     const mobileCartToggle = byId("mobile-cart-toggle");
     const cartBackdrop = byId("customer-cart-backdrop");
@@ -83,12 +83,35 @@
     }
     function findProduct(art) { return state.products.find(p => p.art_number === art); }
 
+    const brandKey = value => String(value || "Unbranded").trim().toLowerCase() || "unbranded";
+    function renderBrandFilters() {
+        const strip = byId("customer-brand-filters");
+        strip.replaceChildren();
+        const brands = new Map();
+        for (const product of state.products) {
+            const label = String(product.brand || "Unbranded").trim() || "Unbranded";
+            if (!brands.has(brandKey(label))) brands.set(brandKey(label), label);
+        }
+        if (state.brand && !brands.has(state.brand)) state.brand = "";
+        for (const [key, label] of [["", "All Brands"], ...[...brands].sort((a,b) => a[1].localeCompare(b[1]))]) {
+            const button = node("button", "brand-filter-chip", label);
+            button.type = "button";
+            button.setAttribute("aria-pressed", String(state.brand === key));
+            button.addEventListener("click", () => {
+                state.brand = key;
+                renderBrandFilters();
+                renderProducts();
+            });
+            strip.appendChild(button);
+        }
+    }
     function renderProducts() {
         const list = byId("customer-products");
         list.replaceChildren();
         const search = byId("customer-search").value.trim().toLowerCase();
-        const products = state.products.filter(p => [String(p.art_number), p.brand || '', ...(p.tags || [])]
-            .some(value => value.toLowerCase().includes(search)));
+        const products = state.products.filter(p => (!state.brand || brandKey(p.brand) === state.brand) &&
+            [String(p.art_number), p.brand || '', ...(p.tags || [])]
+            .some(value => String(value).toLowerCase().includes(search)));
         if (!products.length) {
             list.appendChild(node("p", "empty-state", "No products found."));
             return;
@@ -360,7 +383,70 @@
         } catch (error) { await HawaUI.alert(error.message); }
     }
 
+    function shopInitials(shopName) {
+        const words = String(shopName || "").trim().split(/\s+/u).filter(Boolean);
+        if (!words.length) return "?";
+        const initials = words.length >= 2
+            ? [Array.from(words[0])[0], Array.from(words[1])[0]].join("")
+            : Array.from(words[0]).slice(0, 2).join("");
+        return initials.toLocaleUpperCase();
+    }
+
+    function displayProfile(profile) {
+        state.profile = profile;
+        byId("welcome-title").textContent = `Welcome, ${profile.name}`;
+        byId("welcome-shop").textContent = profile.shop_name;
+        byId("customer-initials").textContent = shopInitials(profile.shop_name);
+        byId("customer-profile-button").title = `View ${profile.shop_name} account details`;
+    }
+
+    function fillProfileForm(profile) {
+        byId("profile-name").value = profile.name || "";
+        byId("profile-phone").value = profile.phone || "";
+        byId("profile-shop").value = profile.shop_name || "";
+        byId("profile-address").value = profile.address || "";
+        byId("profile-gst").value = profile.gst_number || "";
+        byId("profile-error").textContent = "";
+    }
+
+    async function saveProfile(event) {
+        event.preventDefault();
+        const save = byId("profile-save");
+        const errorText = byId("profile-error");
+        errorText.textContent = "";
+        const gst_number = byId("profile-gst").value.trim().toUpperCase();
+        if (gst_number && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/.test(gst_number)) {
+            errorText.textContent = "Please enter a valid GSTIN or leave it blank.";
+            return;
+        }
+        save.disabled = true;
+        try {
+            const updated = await api("/api/customer/profile", {
+                method: "PUT", headers: {"Content-Type":"application/json"},
+                body: JSON.stringify({
+                    name: byId("profile-name").value.trim(),
+                    shop_name: byId("profile-shop").value.trim(),
+                    address: byId("profile-address").value.trim(), gst_number
+                })
+            });
+            displayProfile(updated);
+            byId("customer-profile-dialog").close();
+            HawaUI.toast("Account details updated.", "success");
+        } catch (error) {
+            errorText.textContent = error.message;
+        } finally {
+            save.disabled = false;
+        }
+    }
+
     async function boot() {
+        byId("customer-profile-button").addEventListener("click", () => {
+            if (!state.profile) return;
+            fillProfileForm(state.profile);
+            byId("customer-profile-dialog").showModal();
+        });
+        byId("customer-profile-close").addEventListener("click", () => byId("customer-profile-dialog").close());
+        byId("customer-profile-form").addEventListener("submit", saveProfile);
         productsTab.addEventListener("click", () => showPage("products"));
         ordersTab.addEventListener("click", () => showPage("orders"));
         byId("customer-search").addEventListener("input", renderProducts);
@@ -390,9 +476,9 @@
             const [profile, products] = await Promise.all([
                 api("/api/customer/profile"), api("/api/customer/products")
             ]);
-            byId("welcome-title").textContent = `Welcome, ${profile.name}`;
-            byId("welcome-shop").textContent = profile.shop_name;
+            displayProfile(profile);
             state.products = products;
+            renderBrandFilters();
             renderProducts();
             renderCart();
         } catch (error) {

@@ -21,10 +21,11 @@ async function getSalesAnalytics(pool) {
     `);
     const brands = await pool.query(`
         WITH grouped AS (
-            SELECT COALESCE(NULLIF(BTRIM(p.brand), ''), 'Unspecified brand') AS brand,
+            SELECT COALESCE(NULLIF(BTRIM(p.brand), ''), NULLIF(BTRIM(dp.brand), ''), 'Unspecified brand') AS brand,
                    o.id AS order_id, oi.quantity, oi.unit_price
             FROM orders o JOIN order_items oi ON oi.order_id=o.id
             LEFT JOIN products p ON p.art_number=oi.art_number
+            LEFT JOIN deleted_products dp ON dp.art_number=oi.art_number
             WHERE ${delivered}
         )
         SELECT MIN(brand) AS brand, SUM(quantity) AS units,
@@ -35,14 +36,15 @@ async function getSalesAnalytics(pool) {
         ORDER BY units DESC, brand LIMIT 10
     `);
     const articles = await pool.query(`
-        SELECT oi.art_number, COALESCE(NULLIF(BTRIM(p.brand),''),'Unspecified brand') AS brand,
+        SELECT oi.art_number, COALESCE(NULLIF(BTRIM(p.brand),''),NULLIF(BTRIM(dp.brand),''),'Unspecified brand') AS brand,
                SUM(oi.quantity) AS units, COUNT(DISTINCT o.id) AS orders,
                COALESCE(SUM(oi.quantity * oi.unit_price) FILTER
                    (WHERE oi.unit_price IS NOT NULL AND oi.unit_price > 0),0) AS value
         FROM orders o JOIN order_items oi ON oi.order_id=o.id
         LEFT JOIN products p ON p.art_number=oi.art_number
+        LEFT JOIN deleted_products dp ON dp.art_number=oi.art_number
         WHERE ${delivered}
-        GROUP BY oi.art_number, p.brand
+        GROUP BY oi.art_number, p.brand, dp.brand
         ORDER BY units DESC, oi.art_number LIMIT 10
     `);
     const sizes = await pool.query(`
